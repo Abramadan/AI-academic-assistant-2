@@ -1,0 +1,7 @@
+flask
+flask-cors
+flask-jwt-extended
+bcrypt
+anthropic
+pdfplumber
+python-dotenv
