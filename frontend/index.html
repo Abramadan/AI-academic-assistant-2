@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Academic Assistant</title>
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --primary-dark: #3730a3;
+            --primary-light: #818cf8;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --bg-input: #334155;
+            --text: #f1f5f9;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --error: #ef4444;
+            --radius: 12px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ── Header ── */
+        header {
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border);
+            padding: 0 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 64px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            gap: 16px;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 18px;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .logo-icon {
+            width: 36px;
+            height: 36px;
+            background: var(--primary);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            flex-shrink: 0;
+        }
+
+        nav { display: flex; gap: 4px; }
+
+        nav button {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            padding: 8px 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+        }
+
+        nav button:hover { background: var(--bg-input); color: var(--text); }
+        nav button.active { background: var(--primary); color: white; }
+
+        .api-status-btn {
+            background: var(--bg-input);
+            color: var(--text-muted);
+            border: 1px solid var(--border);
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-family: inherit;
+            font-weight: 500;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.2s;
+        }
+
+        .api-status-btn.connected { color: var(--success); border-color: var(--success); }
+
+        /* ── Main ── */
+        main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            max-width: 920px;
+            margin: 0 auto;
+            width: 100%;
+            padding: 28px 24px;
+        }
+
+        .section { display: none; flex-direction: column; gap: 20px; flex: 1; }
+        .section.active { display: flex; }
+
+        .section-header { margin-bottom: 4px; }
+        .section-title { font-size: 22px; font-weight: 700; }
+        .section-desc { color: var(--text-muted); font-size: 14px; margin-top: 4px; }
+
+        /* ── Cards ── */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px;
+        }
+
+        /* ── Chat ── */
+        #chat-messages {
+            flex: 1;
+            min-height: 380px;
+            max-height: 480px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            padding: 20px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            scroll-behavior: smooth;
+        }
+
+        .message { display: flex; gap: 12px; animation: fadeIn 0.3s ease; }
+        .message.user { flex-direction: row-reverse; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            flex-shrink: 0;
+        }
+
+        .message.user .avatar      { background: var(--primary); }
+        .message.assistant .avatar { background: var(--bg-input); }
+
+        .bubble {
+            max-width: 78%;
+            padding: 12px 16px;
+            border-radius: 12px;
+            font-size: 14px;
+            line-height: 1.7;
+        }
+
+        .message.user .bubble {
+            background: var(--primary);
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+
+        .message.assistant .bubble {
+            background: var(--bg-input);
+            color: var(--text);
+            border-bottom-left-radius: 4px;
+        }
+
+        .bubble pre {
+            background: rgba(0,0,0,0.3);
+            padding: 12px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 8px 0;
+            font-size: 13px;
+        }
+
+        .bubble code { font-family: 'Consolas', monospace; }
+
+        .chat-input-area { display: flex; gap: 12px; align-items: flex-end; }
+
+        #chat-input {
+            flex: 1;
+            min-height: 52px;
+            max-height: 130px;
+            resize: none;
+        }
+
+        /* ── Inputs ── */
+        textarea, input[type="text"], input[type="password"] {
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            font-family: inherit;
+            font-size: 14px;
+            padding: 12px 16px;
+            transition: border-color 0.2s;
+            width: 100%;
+        }
+
+        textarea { resize: vertical; }
+        textarea:focus, input:focus { outline: none; border-color: var(--primary-light); }
+        textarea::placeholder, input::placeholder { color: var(--text-muted); }
+
+        /* ── Buttons ── */
+        button { cursor: pointer; border: none; border-radius: 8px; font-family: inherit; font-weight: 600; transition: all 0.2s; }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+            padding: 12px 24px;
+            font-size: 14px;
+        }
+
+        .btn-primary:hover:not(:disabled) { background: var(--primary-dark); transform: translateY(-1px); }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .btn-secondary {
+            background: var(--bg-input);
+            color: var(--text);
+            padding: 10px 18px;
+            font-size: 13px;
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover { background: var(--border); }
+
+        .btn-ghost {
+            background: none;
+            color: var(--text-muted);
+            padding: 8px 14px;
+            font-size: 13px;
+        }
+
+        .btn-ghost:hover { color: var(--text); background: var(--bg-input); }
+
+        /* ── Selects ── */
+        select {
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            padding: 9px 12px;
+            font-size: 13px;
+            font-family: inherit;
+            cursor: pointer;
+        }
+
+        select:focus { outline: none; border-color: var(--primary-light); }
+
+        /* ── Rows ── */
+        .row { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+        .flex-1 { flex: 1; min-width: 100px; }
+
+        /* ── Loading ── */
+        .loading {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--text-muted);
+            font-size: 14px;
+            padding: 12px 0;
+        }
+
+        .dots { display: flex; gap: 4px; }
+
+        .dots span {
+            width: 6px;
+            height: 6px;
+            background: var(--primary-light);
+            border-radius: 50%;
+            animation: bounce 1.2s infinite;
+        }
+
+        .dots span:nth-child(2) { animation-delay: 0.2s; }
+        .dots span:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes bounce {
+            0%, 80%, 100% { transform: translateY(0); }
+            40%            { transform: translateY(-6px); }
+        }
+
+        /* ── Summary output ── */
+        .output-box {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px;
+            font-size: 14px;
+            line-height: 1.8;
+            display: none;
+        }
+
+        /* ── Quiz ── */
+        #quiz-output { display: none; flex-direction: column; gap: 16px; }
+
+        .quiz-question {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 22px;
+            animation: fadeIn 0.35s ease;
+        }
+
+        .quiz-q-text { font-size: 15px; font-weight: 600; line-height: 1.5; margin-bottom: 16px; }
+        .quiz-options { display: flex; flex-direction: column; gap: 8px; }
+
+        .quiz-option {
+            padding: 11px 16px;
+            background: var(--bg-input);
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            text-align: left;
+            color: var(--text);
+            transition: all 0.18s;
+        }
+
+        .quiz-option:hover:not(:disabled) {
+            border-color: var(--primary-light);
+            background: rgba(79,70,229,0.12);
+        }
+
+        .quiz-option.correct  { border-color: var(--success); background: rgba(16,185,129,0.15); color: var(--success); }
+        .quiz-option.wrong    { border-color: var(--error);   background: rgba(239,68,68,0.15);  color: var(--error);   }
+        .quiz-option:disabled { cursor: not-allowed; }
+
+        .explanation {
+            margin-top: 14px;
+            padding: 11px 14px;
+            background: rgba(79,70,229,0.1);
+            border-left: 3px solid var(--primary);
+            border-radius: 4px;
+            font-size: 13px;
+            color: var(--text-muted);
+            display: none;
+            line-height: 1.6;
+        }
+
+        .quiz-score {
+            text-align: center;
+            padding: 32px 20px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            animation: fadeIn 0.4s ease;
+        }
+
+        .score-emoji  { font-size: 52px; margin-bottom: 10px; }
+        .score-num    { font-size: 52px; font-weight: 800; color: var(--primary-light); }
+        .score-label  { font-size: 18px; font-weight: 600; margin: 8px 0 4px; }
+        .score-detail { color: var(--text-muted); font-size: 14px; margin-bottom: 20px; }
+
+        /* ── Modal ── */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.75);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            backdrop-filter: blur(5px);
+        }
+
+        .modal {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 32px;
+            width: 460px;
+            max-width: 92vw;
+        }
+
+        .modal h2  { font-size: 20px; margin-bottom: 8px; }
+        .modal p   { color: var(--text-muted); font-size: 14px; margin-bottom: 16px; line-height: 1.6; }
+        .modal a   { color: var(--primary-light); text-decoration: none; }
+        .modal a:hover { text-decoration: underline; }
+
+        .form-label {
+            display: block;
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            margin-bottom: 6px;
+        }
+
+        .modal-btns { display: flex; gap: 12px; margin-top: 20px; }
+
+        .alert {
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-bottom: 14px;
+            line-height: 1.5;
+        }
+
+        .alert-info    { background: rgba(79,70,229,0.15);  border: 1px solid var(--primary-light); color: var(--primary-light); }
+        .alert-warning { background: rgba(245,158,11,0.15); border: 1px solid var(--warning);       color: var(--warning); }
+        .alert-error   { background: rgba(239,68,68,0.15);  border: 1px solid var(--error);         color: var(--error); }
+
+        /* ── Welcome placeholder ── */
+        .welcome {
+            text-align: center;
+            padding: 48px 20px;
+            color: var(--text-muted);
+            margin: auto;
+        }
+
+        .welcome .w-icon { font-size: 52px; margin-bottom: 14px; }
+        .welcome p { font-size: 14px; line-height: 1.7; max-width: 320px; margin: 0 auto; }
+
+        /* ── Bottom bar ── */
+        .bar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+
+        /* ── Scrollbar ── */
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+        /* ── Responsive ── */
+        @media (max-width: 580px) {
+            nav button span { display: none; }
+            .logo span { display: none; }
+            main { padding: 16px; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ===================== API KEY MODAL ===================== -->
+<div class="modal-overlay" id="api-modal" style="display:none">
+    <div class="modal">
+        <h2>🎓 Welcome to Academic AI</h2>
+        <p>Enter your <strong>Anthropic API key</strong> to power the AI features. Your key is stored only in your browser's localStorage and is sent directly to Anthropic — never to any third party.</p>
+        <p>Get a free key at <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a> → API Keys.</p>
+        <div class="alert alert-info">Your key starts with <code>sk-ant-</code></div>
+        <label class="form-label" for="api-key-input">Anthropic API Key</label>
+        <input type="password" id="api-key-input" placeholder="sk-ant-api03-..." autocomplete="off" />
+        <div class="modal-btns">
+            <button class="btn-primary" onclick="saveApiKey()">Save &amp; Continue</button>
+            <button class="btn-secondary" onclick="closeModal()">Skip for now</button>
+        </div>
+    </div>
+</div>
+
+<!-- ===================== HEADER ===================== -->
+<header>
+    <div class="logo">
+        <div class="logo-icon">🎓</div>
+        <span>Academic AI</span>
+    </div>
+
+    <nav>
+        <button class="active" onclick="showSection('chat')"      id="nav-chat">      💬 <span>Chat</span>      </button>
+        <button               onclick="showSection('summarize')"  id="nav-summarize"> 📄 <span>Summarize</span> </button>
+        <button               onclick="showSection('quiz')"       id="nav-quiz">      🧠 <span>Quiz</span>      </button>
+    </nav>
+
+    <button class="api-status-btn" onclick="openModal()" id="api-status-btn">🔑 Set API Key</button>
+</header>
+
+<!-- ===================== MAIN ===================== -->
+<main>
+
+    <!-- ───────── CHAT ───────── -->
+    <div class="section active" id="section-chat">
+        <div class="section-header">
+            <div class="section-title">Academic Q&amp;A Chat</div>
+            <div class="section-desc">Ask any academic question — science, math, history, literature, coding, and more.</div>
+        </div>
+
+        <div id="chat-messages">
+            <div class="welcome" id="chat-welcome">
+                <div class="w-icon">💬</div>
+                <p>Ask me anything academic! I can explain concepts, solve problems step-by-step, help with research, and more.</p>
+            </div>
+        </div>
+
+        <div class="chat-input-area">
+            <textarea id="chat-input" placeholder="Ask an academic question… (Enter to send, Shift+Enter for new line)" rows="2"></textarea>
+            <button class="btn-primary" id="chat-send-btn" onclick="sendChat()">Send</button>
+        </div>
+
+        <div class="bar">
+            <button class="btn-ghost" onclick="clearChat()">🗑 Clear chat</button>
+            <select id="model-select">
+                <option value="claude-haiku-4-5-20251001">Haiku 4.5 — Fast &amp; cheap</option>
+                <option value="claude-sonnet-4-6" selected>Sonnet 4.6 — Balanced</option>
+                <option value="claude-opus-4-7">Opus 4.7 — Most capable</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- ───────── SUMMARIZE ───────── -->
+    <div class="section" id="section-summarize">
+        <div class="section-header">
+            <div class="section-title">Text Summarizer</div>
+            <div class="section-desc">Paste any academic text, article, or lecture notes to get a structured summary.</div>
+        </div>
+
+        <div class="card">
+            <label class="form-label">Paste your text below</label>
+            <textarea id="summary-input" placeholder="Paste your article, textbook excerpt, lecture notes, or any academic text here…" style="min-height:180px;margin-top:8px"></textarea>
+        </div>
+
+        <div class="row">
+            <div class="flex-1">
+                <label class="form-label">Summary style</label>
+                <select id="summary-style" style="width:100%">
+                    <option value="concise">Concise (3–5 sentences)</option>
+                    <option value="detailed" selected>Detailed (structured)</option>
+                    <option value="bullet">Bullet points</option>
+                    <option value="eli5">Explain simply (ELI5)</option>
+                </select>
+            </div>
+            <button class="btn-primary" onclick="summarizeText()" id="sum-btn">Summarize</button>
+        </div>
+
+        <div id="summary-loading" class="loading" style="display:none">
+            <div class="dots"><span></span><span></span><span></span></div>
+            Generating summary…
+        </div>
+
+        <div id="summary-output" class="output-box"></div>
+    </div>
+
+    <!-- ───────── QUIZ ───────── -->
+    <div class="section" id="section-quiz">
+        <div class="section-header">
+            <div class="section-title">Quiz Generator</div>
+            <div class="section-desc">Enter a topic or paste study material to generate an interactive multiple-choice quiz.</div>
+        </div>
+
+        <div class="card">
+            <label class="form-label">Topic or study material</label>
+            <textarea id="quiz-input" placeholder="e.g. 'The causes of World War I' or paste your study notes here…" style="min-height:120px;margin-top:8px"></textarea>
+
+            <div class="row" style="margin-top:16px">
+                <div class="flex-1">
+                    <label class="form-label">Questions</label>
+                    <select id="quiz-count" style="width:100%">
+                        <option value="3">3 questions</option>
+                        <option value="5" selected>5 questions</option>
+                        <option value="10">10 questions</option>
+                    </select>
+                </div>
+                <div class="flex-1">
+                    <label class="form-label">Difficulty</label>
+                    <select id="quiz-difficulty" style="width:100%">
+                        <option value="easy">Easy</option>
+                        <option value="medium" selected>Medium</option>
+                        <option value="hard">Hard</option>
+                    </select>
+                </div>
+                <button class="btn-primary" onclick="generateQuiz()" id="quiz-btn" style="align-self:flex-end">Generate Quiz</button>
+            </div>
+        </div>
+
+        <div id="quiz-loading" class="loading" style="display:none">
+            <div class="dots"><span></span><span></span><span></span></div>
+            Generating your quiz…
+        </div>
+
+        <div id="quiz-output"></div>
+    </div>
+
+</main>
+
+<!-- ===================== SCRIPT ===================== -->
+<script>
+/* ────── State ────── */
+let apiKey      = localStorage.getItem('academic_ai_key') || '';
+let chatHistory = [];
+let quizData    = [];
+let quizAnswered = 0;
+let quizCorrect  = 0;
+
+/* ────── Init ────── */
+window.addEventListener('load', () => {
+    if (apiKey) {
+        setApiStatus(true);
+    } else {
+        document.getElementById('api-modal').style.display = 'flex';
+    }
+});
+
+/* ────── Modal ────── */
+function openModal() {
+    document.getElementById('api-key-input').value = apiKey;
+    document.getElementById('api-modal').style.display = 'flex';
+}
+
+function closeModal() {
+    document.getElementById('api-modal').style.display = 'none';
+}
+
+function saveApiKey() {
+    const val = document.getElementById('api-key-input').value.trim();
+    if (!val)                     { alert('Please paste your API key.'); return; }
+    if (!val.startsWith('sk-ant-')){ alert('That doesn\'t look like an Anthropic key (should start with sk-ant-).'); return; }
+    apiKey = val;
+    localStorage.setItem('academic_ai_key', val);
+    setApiStatus(true);
+    closeModal();
+}
+
+function setApiStatus(connected) {
+    const btn = document.getElementById('api-status-btn');
+    btn.textContent = connected ? '🟢 API Connected' : '🔑 Set API Key';
+    btn.classList.toggle('connected', connected);
+}
+
+/* ────── Nav ────── */
+function showSection(name) {
+    document.querySelectorAll('.section').forEach(s  => s.classList.remove('active'));
+    document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+    document.getElementById(`section-${name}`).classList.add('active');
+    document.getElementById(`nav-${name}`).classList.add('active');
+}
+
+/* ────── Claude API ────── */
+async function callClaude(messages, system, model) {
+    if (!apiKey) { openModal(); throw new Error('No API key set.'); }
+
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+            'x-api-key':    apiKey,
+            'anthropic-version': '2023-06-01',
+            'content-type': 'application/json',
+            'anthropic-dangerous-direct-browser-access': 'true'
+        },
+        body: JSON.stringify({
+            model:      model || 'claude-sonnet-4-6',
+            max_tokens: 2048,
+            system,
+            messages
+        })
+    });
+
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.error?.message || `HTTP ${res.status}`);
+    }
+
+    const data = await res.json();
+    return data.content[0].text;
+}
+
+/* ────── Chat ────── */
+document.getElementById('chat-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); }
+});
+
+function addMessage(role, html) {
+    const box = document.getElementById('chat-messages');
+    const welcome = document.getElementById('chat-welcome');
+    if (welcome) welcome.remove();
+
+    const wrap = document.createElement('div');
+    wrap.className = `message ${role}`;
+
+    const av = document.createElement('div');
+    av.className = 'avatar';
+    av.textContent = role === 'user' ? '👤' : '🎓';
+
+    const bub = document.createElement('div');
+    bub.className = 'bubble';
+    bub.innerHTML = html;
+
+    wrap.appendChild(av);
+    wrap.appendChild(bub);
+    box.appendChild(wrap);
+    box.scrollTop = box.scrollHeight;
+    return wrap;
+}
+
+function addThinking() {
+    const box = document.getElementById('chat-messages');
+    const wrap = document.createElement('div');
+    wrap.className = 'message assistant';
+    wrap.id = 'thinking-msg';
+    wrap.innerHTML = `
+        <div class="avatar">🎓</div>
+        <div class="loading" style="padding:6px 0">
+            <div class="dots"><span></span><span></span><span></span></div>
+            Thinking…
+        </div>`;
+    box.appendChild(wrap);
+    box.scrollTop = box.scrollHeight;
+}
+
+async function sendChat() {
+    const input = document.getElementById('chat-input');
+    const text  = input.value.trim();
+    if (!text) return;
+
+    const btn   = document.getElementById('chat-send-btn');
+    const model = document.getElementById('model-select').value;
+
+    input.value  = '';
+    btn.disabled = true;
+
+    addMessage('user', escHtml(text).replace(/\n/g, '<br>'));
+    chatHistory.push({ role: 'user', content: text });
+
+    addThinking();
+
+    try {
+        const reply = await callClaude(
+            chatHistory,
+            `You are an expert AI academic assistant. Help students and researchers with questions across all subjects — science, math, history, literature, philosophy, and computer science. Provide clear, accurate, educational answers. Break down complex ideas step by step. Use examples. Format code or math clearly.`,
+            model
+        );
+        document.getElementById('thinking-msg')?.remove();
+        chatHistory.push({ role: 'assistant', content: reply });
+        addMessage('assistant', mdToHtml(reply));
+    } catch (err) {
+        document.getElementById('thinking-msg')?.remove();
+        addMessage('assistant', `<span style="color:var(--error)">Error: ${escHtml(err.message)}</span>`);
+    }
+
+    btn.disabled = false;
+    input.focus();
+}
+
+function clearChat() {
+    chatHistory = [];
+    const box = document.getElementById('chat-messages');
+    box.innerHTML = `<div class="welcome" id="chat-welcome">
+        <div class="w-icon">💬</div>
+        <p>Ask me anything academic! I can explain concepts, solve problems step-by-step, help with research, and more.</p>
+    </div>`;
+}
+
+/* ────── Summarize ────── */
+async function summarizeText() {
+    const text  = document.getElementById('summary-input').value.trim();
+    if (!text)  { alert('Please paste some text to summarize.'); return; }
+
+    const style   = document.getElementById('summary-style').value;
+    const output  = document.getElementById('summary-output');
+    const loading = document.getElementById('summary-loading');
+    const btn     = document.getElementById('sum-btn');
+
+    output.style.display  = 'none';
+    loading.style.display = 'flex';
+    btn.disabled = true;
+
+    const styleMap = {
+        concise:  'Provide a brief, concise summary in 3–5 sentences covering only the most important points.',
+        detailed: 'Provide a detailed summary with clearly labeled sections: **Main Topic**, **Key Points** (with sub-bullets), **Important Details**, and **Conclusion / Implications**.',
+        bullet:   'Return a structured bullet-point summary. Use clear category headings, • for main points, and – for sub-points.',
+        eli5:     'Explain this in plain, simple language as if speaking to someone who has never heard of this topic before. Use short sentences, everyday words, and helpful analogies.'
+    };
+
+    try {
+        const model  = document.getElementById('model-select').value;
+        const result = await callClaude(
+            [{ role: 'user', content: `Please summarize the following text:\n\n${text}` }],
+            `You are an expert academic summarizer. ${styleMap[style]} Be accurate and educational.`,
+            model
+        );
+        output.style.display = 'block';
+        output.innerHTML     = mdToHtml(result);
+    } catch (err) {
+        output.style.display = 'block';
+        output.innerHTML     = `<span style="color:var(--error)">Error: ${escHtml(err.message)}</span>`;
+    }
+
+    loading.style.display = 'none';
+    btn.disabled = false;
+}
+
+/* ────── Quiz ────── */
+async function generateQuiz() {
+    const topic = document.getElementById('quiz-input').value.trim();
+    if (!topic) { alert('Please enter a topic or paste study material.'); return; }
+
+    const count      = document.getElementById('quiz-count').value;
+    const difficulty = document.getElementById('quiz-difficulty').value;
+    const output     = document.getElementById('quiz-output');
+    const loading    = document.getElementById('quiz-loading');
+    const btn        = document.getElementById('quiz-btn');
+
+    output.innerHTML  = '';
+    output.style.display = 'none';
+    loading.style.display = 'flex';
+    btn.disabled = true;
+    quizData    = [];
+    quizAnswered = quizCorrect = 0;
+
+    const prompt = `Generate exactly ${count} multiple-choice quiz questions about: "${topic}"
+
+Difficulty: ${difficulty}
+
+Return ONLY a valid JSON array — no extra text, no markdown fences:
+[
+  {
+    "question": "...",
+    "options": ["A text", "B text", "C text", "D text"],
+    "correct": 0,
+    "explanation": "Why this answer is correct."
+  }
+]
+
+"correct" is the 0-based index of the right option. Exactly ${count} items.`;
+
+    try {
+        const model  = document.getElementById('model-select').value;
+        const raw    = await callClaude(
+            [{ role: 'user', content: prompt }],
+            'You are a quiz generator. Return ONLY a valid JSON array with no extra text or markdown.',
+            model
+        );
+        const clean  = raw.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+        quizData     = JSON.parse(clean);
+        renderQuiz();
+    } catch (err) {
+        output.style.display = 'flex';
+        output.innerHTML = `<div class="alert alert-error">Failed to generate quiz: ${escHtml(err.message)}. Please try again.</div>`;
+    }
+
+    loading.style.display = 'none';
+    btn.disabled = false;
+}
+
+function renderQuiz() {
+    const output = document.getElementById('quiz-output');
+    output.innerHTML = '';
+    output.style.display = 'flex';
+
+    quizData.forEach((q, qi) => {
+        const letters = ['A', 'B', 'C', 'D'];
+        const div = document.createElement('div');
+        div.className = 'quiz-question';
+        div.innerHTML = `
+            <div class="quiz-q-text">Q${qi + 1}. ${escHtml(q.question)}</div>
+            <div class="quiz-options" id="opts-${qi}">
+                ${q.options.map((opt, oi) => `
+                    <button class="quiz-option" onclick="answerQuiz(${qi},${oi})" id="opt-${qi}-${oi}">
+                        <strong>${letters[oi]}.</strong> ${escHtml(opt)}
+                    </button>`).join('')}
+            </div>
+            <div class="explanation" id="exp-${qi}">💡 ${escHtml(q.explanation)}</div>`;
+        output.appendChild(div);
+    });
+}
+
+function answerQuiz(qi, selected) {
+    const q    = quizData[qi];
+    const opts = document.querySelectorAll(`#opts-${qi} .quiz-option`);
+    const exp  = document.getElementById(`exp-${qi}`);
+
+    opts.forEach((btn, i) => {
+        btn.disabled = true;
+        if (i === q.correct) btn.classList.add('correct');
+        else if (i === selected) btn.classList.add('wrong');
+    });
+
+    exp.style.display = 'block';
+    quizAnswered++;
+    if (selected === q.correct) quizCorrect++;
+    if (quizAnswered === quizData.length) showScore();
+}
+
+function showScore() {
+    const output = document.getElementById('quiz-output');
+    const pct    = Math.round((quizCorrect / quizData.length) * 100);
+    const emoji  = pct >= 80 ? '🎉' : pct >= 60 ? '👍' : '📚';
+    const msg    = pct >= 80 ? 'Excellent work!' : pct >= 60 ? 'Good effort — keep going!' : 'Keep studying, you\'ve got this!';
+
+    const score = document.createElement('div');
+    score.className = 'quiz-score';
+    score.innerHTML = `
+        <div class="score-emoji">${emoji}</div>
+        <div class="score-num">${pct}%</div>
+        <div class="score-label">${msg}</div>
+        <div class="score-detail">${quizCorrect} of ${quizData.length} correct</div>
+        <button class="btn-primary" onclick="generateQuiz()">Try Again</button>`;
+    output.appendChild(score);
+    score.scrollIntoView({ behavior: 'smooth' });
+}
+
+/* ────── Helpers ────── */
+function escHtml(t) {
+    return String(t)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
+
+function mdToHtml(text) {
+    return escHtml(text)
+        .replace(/```(\w+)?\n?([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
+        .replace(/`([^`]+)`/g, '<code style="background:rgba(0,0,0,0.3);padding:2px 6px;border-radius:4px;font-family:monospace;font-size:0.9em">$1</code>')
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.+?)\*/g, '<em>$1</em>')
+        .replace(/^### (.+)$/gm, '<h4 style="margin:10px 0 4px;font-size:14px;color:var(--primary-light)">$1</h4>')
+        .replace(/^## (.+)$/gm,  '<h3 style="margin:12px 0 6px;font-size:15px">$1</h3>')
+        .replace(/^# (.+)$/gm,   '<h2 style="margin:14px 0 8px;font-size:16px">$1</h2>')
+        .replace(/^• (.+)$/gm,   '<li style="margin-left:18px;margin-bottom:4px">$1</li>')
+        .replace(/^[-*] (.+)$/gm,'<li style="margin-left:18px;margin-bottom:4px">$1</li>')
+        .replace(/\n/g, '<br>');
+}
+</script>
+</body>
+</html>
