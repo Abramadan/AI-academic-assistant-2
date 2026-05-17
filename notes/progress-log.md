@@ -4,6 +4,29 @@
 
 ---
 
+## 2026-05-17 — Project Objectives Defined
+
+**What was done:**
+- Defined all 7 core features of the AI Academic Assistant
+- Created full feature specification document: `docs/project-objectives.md`
+- Updated README.md with complete feature table and build order
+- Documented technical approach for each feature
+
+**Features defined:**
+1. User Authentication (Login & Register)
+2. Academic Question & Answering Module
+3. PDF Upload & Summarization
+4. Quiz Generation System
+5. Study Planner
+6. Reminder Assistant
+7. Dark Mode Interface
+
+**Next steps:**
+- Begin building Feature 7: Dark Mode Interface (UI foundation)
+- Then Feature 1: User Authentication
+
+---
+
 ## 2026-05-17 — Project Setup
 
 **What was done:**
@@ -13,12 +36,8 @@
 - Wrote system architecture documentation
 - Added important-info.md for tracking key facts and resources
 - Added .gitignore to protect sensitive files
+- Copied existing AI Academic Assistant frontend (index.html)
 - Made initial commit and pushed all files to GitHub
-
-**Next steps:**
-- Copy existing AI Academic Assistant code into `frontend/` and `backend/`
-- Begin building out features
-- Document all research findings in `docs/research/`
 
 ---
 
