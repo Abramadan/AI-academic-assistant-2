@@ -104,20 +104,26 @@ def qa():
         return jsonify({'error': 'Question is required'}), 400
 
     ctx = f' This is a {subject} question.' if subject else ''
-    msg = ai.messages.create(
-        model='claude-sonnet-4-6',
-        max_tokens=1024,
-        messages=[{
-            'role': 'user',
-            'content': (
-                f'You are an expert academic tutor.{ctx} '
-                f'Answer the following question clearly and accurately, '
-                f'explaining concepts so the student truly understands.\n\n'
-                f'Question: {question}'
-            )
-        }]
-    )
-    return jsonify({'answer': msg.content[0].text})
+    try:
+        msg = ai.messages.create(
+            model='claude-sonnet-4-6',
+            max_tokens=1024,
+            messages=[{
+                'role': 'user',
+                'content': (
+                    f'You are an expert academic tutor.{ctx} '
+                    f'Answer the following question clearly and accurately, '
+                    f'explaining concepts so the student truly understands.\n\n'
+                    f'Question: {question}'
+                )
+            }]
+        )
+        return jsonify({'answer': msg.content[0].text})
+    except Exception as e:
+        err = str(e)
+        if 'credit balance is too low' in err or 'billing' in err.lower():
+            return jsonify({'error': 'Anthropic API has no credits. Please add credits at console.anthropic.com → Plans & Billing.'}), 402
+        return jsonify({'error': f'AI error: {err}'}), 500
 
 # ── PDF ─────────────────────────────────────────────────────
 
@@ -142,20 +148,26 @@ def upload_pdf():
     if not text.strip():
         return jsonify({'error': 'Could not extract text from this PDF'}), 400
 
-    msg = ai.messages.create(
-        model='claude-sonnet-4-6',
-        max_tokens=1500,
-        messages=[{
-            'role': 'user',
-            'content': (
-                'Please provide a comprehensive academic summary of the following text. '
-                'Structure your response with these sections:\n'
-                '1. Main Topic\n2. Key Concepts\n3. Important Details\n4. Conclusions\n\n'
-                f'Text:\n{text[:8000]}'
-            )
-        }]
-    )
-    return jsonify({'summary': msg.content[0].text, 'text': text[:5000]})
+    try:
+        msg = ai.messages.create(
+            model='claude-sonnet-4-6',
+            max_tokens=1500,
+            messages=[{
+                'role': 'user',
+                'content': (
+                    'Please provide a comprehensive academic summary of the following text. '
+                    'Structure your response with these sections:\n'
+                    '1. Main Topic\n2. Key Concepts\n3. Important Details\n4. Conclusions\n\n'
+                    f'Text:\n{text[:8000]}'
+                )
+            }]
+        )
+        return jsonify({'summary': msg.content[0].text, 'text': text[:5000]})
+    except Exception as e:
+        err = str(e)
+        if 'credit balance is too low' in err or 'billing' in err.lower():
+            return jsonify({'error': 'Anthropic API has no credits. Please add credits at console.anthropic.com → Plans & Billing.'}), 402
+        return jsonify({'error': f'AI error: {err}'}), 500
 
 # ── QUIZ ─────────────────────────────────────────────────────
 
@@ -190,11 +202,17 @@ def generate_quiz():
         'correct_index is the 0-based index of the correct answer.'
     )
 
-    msg = ai.messages.create(
-        model='claude-sonnet-4-6',
-        max_tokens=3000,
-        messages=[{'role': 'user', 'content': prompt}]
-    )
+    try:
+        msg = ai.messages.create(
+            model='claude-sonnet-4-6',
+            max_tokens=3000,
+            messages=[{'role': 'user', 'content': prompt}]
+        )
+    except Exception as e:
+        err = str(e)
+        if 'credit balance is too low' in err or 'billing' in err.lower():
+            return jsonify({'error': 'Anthropic API has no credits. Please add credits at console.anthropic.com → Plans & Billing.'}), 402
+        return jsonify({'error': f'AI error: {err}'}), 500
 
     raw = msg.content[0].text.strip()
     if '```' in raw:
@@ -203,12 +221,15 @@ def generate_quiz():
             raw = raw[4:]
         raw = raw.split('```')[0]
 
-    questions = json.loads(raw.strip())
-    return jsonify({'questions': questions})
+    try:
+        questions = json.loads(raw.strip())
+        return jsonify({'questions': questions})
+    except Exception as e:
+        return jsonify({'error': f'Failed to parse quiz: {str(e)}'}), 500
 
 # ── MAIN ─────────────────────────────────────────────────────
 
 if __name__ == '__main__':
     init_db()
-    print('\n🎓 AI Academic Assistant backend running at http://localhost:5000\n')
+    print('\nAI Academic Assistant backend running at http://localhost:5000\n')
     app.run(debug=True, port=5000)
