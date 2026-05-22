@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Academic Assistant</title>
+<style>
+:root {
+  --bg:#0f172a; --bg2:#1e293b; --bg3:#334155;
+  --text:#f1f5f9; --text2:#94a3b8;
+  --primary:#6366f1; --primary-h:#4f46e5;
+  --border:#334155; --success:#10b981;
+  --warn:#f59e0b; --danger:#ef4444;
+  --radius:12px; --shadow:0 4px 24px rgba(0,0,0,.3);
+}
+body.light {
+  --bg:#f8fafc; --bg2:#ffffff; --bg3:#f1f5f9;
+  --text:#1e293b; --text2:#64748b;
+  --border:#e2e8f0; --shadow:0 4px 24px rgba(0,0,0,.08);
+}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);transition:background .3s,color .3s;min-height:100vh}
+#auth-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg)}
+.auth-card{background:var(--bg2);border:1px solid var(--border);border-radius:20px;padding:40px;width:100%;max-width:420px;box-shadow:var(--shadow)}
+.auth-logo{text-align:center;margin-bottom:32px}
+.auth-logo .ico{font-size:48px;margin-bottom:10px}
+.auth-logo h1{font-size:22px;font-weight:700}
+.auth-logo p{color:var(--text2);font-size:14px;margin-top:4px}
+.auth-tabs{display:flex;background:var(--bg3);border-radius:10px;padding:4px;margin-bottom:28px}
+.auth-tab{flex:1;padding:10px;border:none;background:transparent;color:var(--text2);border-radius:8px;cursor:pointer;font-size:14px;font-weight:500;transition:all .2s}
+.auth-tab.active{background:var(--primary);color:#fff}
+.fg{margin-bottom:16px}
+.fg label{display:block;font-size:13px;font-weight:500;color:var(--text2);margin-bottom:6px}
+.fg input{width:100%;padding:12px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;outline:none;transition:border-color .2s}
+.fg input:focus{border-color:var(--primary)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:12px 20px;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;transition:all .2s}
+.btn-primary{background:var(--primary);color:#fff;width:100%}
+.btn-primary:hover{background:var(--primary-h)}
+.btn-secondary{background:var(--bg3);color:var(--text);border:1px solid var(--border)}
+.btn-secondary:hover{background:var(--border)}
+.btn-sm{padding:6px 12px;font-size:13px;width:auto}
+.btn:disabled{opacity:.6;cursor:not-allowed}
+#app{display:grid;grid-template-rows:64px 1fr;grid-template-columns:240px 1fr;height:100vh}
+header{grid-column:1/-1;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 24px;z-index:100}
+.hlogo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:16px}
+.hlogo span{font-size:22px}
+.hactions{display:flex;align-items:center;gap:12px}
+.icon-btn{width:38px;height:38px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:all .2s}
+.icon-btn:hover{background:var(--border)}
+.uchip{display:flex;align-items:center;gap:8px;padding:6px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;font-size:13px}
+.avatar{width:28px;height:28px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff}
+aside{background:var(--bg2);border-right:1px solid var(--border);padding:16px 8px;overflow-y:auto}
+.nav-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--text2);padding:4px 12px;margin-bottom:4px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;cursor:pointer;font-size:14px;font-weight:500;color:var(--text2);transition:all .15s;border:none;background:transparent;width:100%;text-align:left}
+.nav-item:hover{background:var(--bg3);color:var(--text)}
+.nav-item.active{background:var(--primary);color:#fff}
+.nav-icon{font-size:18px;width:22px;text-align:center}
+main{overflow-y:auto;background:var(--bg)}
+.cs{display:none;padding:32px;max-width:900px}
+.cs.active{display:block}
+.sh{margin-bottom:28px}
+.sh h2{font-size:24px;font-weight:700}
+.sh p{color:var(--text2);margin-top:4px;font-size:14px}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:20px}
+.card-title{font-size:15px;font-weight:600;margin-bottom:16px}
+.mb16{margin-bottom:16px}.mt16{margin-top:16px}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;margin-bottom:28px}
+.stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:20px;text-align:center}
+.stat-ico{font-size:28px;margin-bottom:8px}
+.stat-val{font-size:28px;font-weight:700;color:var(--primary)}
+.stat-lbl{font-size:13px;color:var(--text2);margin-top:4px}
+.quick-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+.qbtn{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;cursor:pointer;text-align:left;transition:all .2s;color:var(--text);width:100%}
+.qbtn:hover{border-color:var(--primary);transform:translateY(-2px)}
+.qbtn .qi{font-size:24px;margin-bottom:8px}
+.qbtn .ql{font-size:14px;font-weight:600}
+.qbtn .qd{font-size:12px;color:var(--text2);margin-top:2px}
+.chat-box{background:var(--bg3);border-radius:var(--radius);padding:20px;min-height:300px;max-height:440px;overflow-y:auto;margin-bottom:16px;display:flex;flex-direction:column;gap:16px}
+.msg{display:flex;gap:12px;align-items:flex-start}
+.msg.user{flex-direction:row-reverse}
+.mavatar{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.msg.user .mavatar{background:var(--primary)}
+.msg.ai .mavatar{background:var(--bg2);border:1px solid var(--border)}
+.mbody{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:12px 16px;max-width:75%;font-size:14px;line-height:1.6}
+.msg.user .mbody{background:var(--primary);color:#fff;border-color:var(--primary)}
+.chat-row{display:flex;gap:10px}
+.chat-row input{flex:1;padding:12px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;outline:none}
+.chat-row input:focus{border-color:var(--primary)}
+select.inp{padding:10px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;outline:none}
+.upload-zone{border:2px dashed var(--border);border-radius:var(--radius);padding:48px;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:20px}
+.upload-zone:hover,.upload-zone.over{border-color:var(--primary);background:rgba(99,102,241,.05)}
+.upload-zone .uico{font-size:48px;margin-bottom:12px}
+.upload-zone .utitle{font-size:16px;font-weight:600;margin-bottom:4px}
+.upload-zone .uhint{font-size:13px;color:var(--text2)}
+.summary-out{background:var(--bg3);border-radius:var(--radius);padding:20px;font-size:14px;line-height:1.7;white-space:pre-wrap}
+.quiz-q{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:24px;margin-bottom:16px}
+.qnum{font-size:12px;color:var(--primary);font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px}
+.qtext{font-size:16px;font-weight:600;margin-bottom:16px;line-height:1.5}
+.opts{display:grid;gap:8px}
+.opt{padding:12px 16px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;cursor:pointer;text-align:left;color:var(--text);font-size:14px;transition:all .15s;width:100%}
+.opt:hover{border-color:var(--primary)}
+.opt.sel{border-color:var(--primary);background:rgba(99,102,241,.1)}
+.opt.correct{border-color:var(--success);background:rgba(16,185,129,.1);color:var(--success)}
+.opt.wrong{border-color:var(--danger);background:rgba(239,68,68,.1);color:var(--danger)}
+.score-wrap{text-align:center;padding:40px}
+.score-circle{width:120px;height:120px;border-radius:50%;background:var(--bg3);border:4px solid var(--primary);display:flex;flex-direction:column;align-items:center;justify-content:center;margin:0 auto 20px}
+.score-n{font-size:32px;font-weight:700;color:var(--primary)}
+.score-l{font-size:12px;color:var(--text2)}
+.expl{margin-top:12px;padding:12px;background:rgba(99,102,241,.08);border-radius:8px;font-size:13px;color:var(--text2)}
+.task-form{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px}
+.task-form input,.task-form select{padding:10px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;outline:none;flex:1;min-width:140px}
+.task-list{display:flex;flex-direction:column;gap:8px}
+.task{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:14px 16px;display:flex;align-items:center;gap:12px}
+.task.done{opacity:.55}
+.task.done .ttitle{text-decoration:line-through}
+.tcheck{width:20px;height:20px;border-radius:50%;border:2px solid var(--border);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s;font-size:11px}
+.tcheck.on{background:var(--success);border-color:var(--success);color:#fff}
+.tinfo{flex:1}
+.ttitle{font-size:14px;font-weight:500}
+.tmeta{font-size:12px;color:var(--text2);margin-top:2px}
+.badge{padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600}
+.bm{background:rgba(99,102,241,.15);color:#6366f1}
+.bs{background:rgba(16,185,129,.15);color:#10b981}
+.bh{background:rgba(245,158,11,.15);color:#f59e0b}
+.be{background:rgba(239,68,68,.15);color:#ef4444}
+.bo{background:rgba(148,163,184,.15);color:#94a3b8}
+.prog-bar{background:var(--bg3);border-radius:20px;height:8px;overflow:hidden}
+.prog-fill{height:100%;background:var(--primary);border-radius:20px;transition:width .3s}
+.rem-form{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;margin-bottom:20px;align-items:end}
+.rem-form input{padding:10px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;outline:none;width:100%}
+.rem-form input:focus{border-color:var(--primary)}
+.rem-form label{display:block;font-size:13px;font-weight:500;color:var(--text2);margin-bottom:6px}
+.rem-list{display:flex;flex-direction:column;gap:8px}
+.rem{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:14px 16px;display:flex;align-items:center;gap:12px}
+.rem.done{opacity:.5}
+.rinfo{flex:1}
+.rmsg{font-size:14px;font-weight:500}
+.rtime{font-size:12px;color:var(--text2);margin-top:2px}
+.rstatus{padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600}
+.sup{background:rgba(99,102,241,.15);color:#6366f1}
+.sdue{background:rgba(245,158,11,.15);color:#f59e0b}
+.sdone{background:rgba(148,163,184,.15);color:#94a3b8}
+.empty{text-align:center;color:var(--text2);padding:40px;font-size:14px}
+.empty .eico{font-size:48px;margin-bottom:12px}
+#toasts{position:fixed;bottom:24px;right:24px;z-index:9999;display:flex;flex-direction:column;gap:8px}
+.toast{padding:12px 20px;border-radius:10px;font-size:14px;font-weight:500;box-shadow:var(--shadow);animation:slideIn .3s ease;min-width:220px}
+.t-success{background:var(--success);color:#fff}
+.t-error{background:var(--danger);color:#fff}
+.t-info{background:var(--primary);color:#fff}
+@keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+.spin{width:16px;height:16px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:rot .6s linear infinite;display:inline-block}
+.spin-d{width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:rot .6s linear infinite;display:inline-block}
+@keyframes rot{to{transform:rotate(360deg)}}
+.loading{display:flex;align-items:center;gap:10px;color:var(--text2);font-size:14px;padding:16px}
+.hidden{display:none!important}
+.flex{display:flex}.gap8{gap:8px}.gap12{gap:12px}.ac{align-items:center}.jb{justify-content:space-between}.wfull{width:100%}
+::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+@media(max-width:768px){#app{grid-template-columns:1fr}aside{display:none}.cs{padding:16px}}
+</style>
+</head>
+<body class="dark">
+
+<div id="auth-screen">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <div class="ico">🎓</div>
+      <h1>AI Academic Assistant</h1>
+      <p>Your intelligent study companion</p>
+    </div>
+    <div class="auth-tabs">
+      <button class="auth-tab active" onclick="showTab('login')">Sign In</button>
+      <button class="auth-tab" onclick="showTab('register')">Register</button>
+    </div>
+    <div id="login-form">
+      <div class="fg"><label>Email</label><input type="email" id="le" placeholder="you@example.com"></div>
+      <div class="fg"><label>Password</label><input type="password" id="lp" placeholder="Your password" onkeydown="if(event.key==='Enter')doLogin()"></div>
+      <button class="btn btn-primary" id="login-btn" onclick="doLogin()">Sign In</button>
+    </div>
+    <div id="reg-form" class="hidden">
+      <div class="fg"><label>Full Name</label><input type="text" id="rn" placeholder="Your full name"></div>
+      <div class="fg"><label>Email</label><input type="email" id="re" placeholder="you@example.com"></div>
+      <div class="fg"><label>Password</label><input type="password" id="rp" placeholder="Create a password"></div>
+      <div class="fg"><label>Confirm Password</label><input type="password" id="rc" placeholder="Repeat password" onkeydown="if(event.key==='Enter')doRegister()"></div>
+      <button class="btn btn-primary" id="reg-btn" onclick="doRegister()">Create Account</button>
+    </div>
+  </div>
+</div>
+
+<div id="app" class="hidden">
+  <header>
+    <div class="hlogo"><span>🎓</span> AI Academic Assistant</div>
+    <div class="hactions">
+      <button class="icon-btn" id="theme-btn" onclick="toggleTheme()" title="Toggle theme">☀️</button>
+      <div class="uchip">
+        <div class="avatar" id="u-avatar">U</div>
+        <span id="u-name">User</span>
+      </div>
+      <button class="btn btn-secondary btn-sm" onclick="doLogout()">Logout</button>
+    </div>
+  </header>
+  <aside>
+    <div style="margin-bottom:8px">
+      <div class="nav-label">Main</div>
+      <button class="nav-item active" id="nav-dashboard" onclick="go('dashboard')"><span class="nav-icon">📊</span>Dashboard</button>
+    </div>
+    <div>
+      <div class="nav-label">Features</div>
+      <button class="nav-item" id="nav-qa" onclick="go('qa')"><span class="nav-icon">💬</span>Ask AI</button>
+      <button class="nav-item" id="nav-pdf" onclick="go('pdf')"><span class="nav-icon">📄</span>PDF Summary</button>
+      <button class="nav-item" id="nav-quiz" onclick="go('quiz')"><span class="nav-icon">🧠</span>Quiz Generator</button>
+      <button class="nav-item" id="nav-planner" onclick="go('planner')"><span class="nav-icon">📅</span>Study Planner</button>
+      <button class="nav-item" id="nav-reminders" onclick="go('reminders')"><span class="nav-icon">🔔</span>Reminders</button>
+    </div>
+  </aside>
+  <main>
+    <section class="cs active" id="s-dashboard">
+      <div class="sh"><h2>📊 Dashboard</h2><p>Welcome back! Here's your academic overview.</p></div>
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-ico">💬</div><div class="stat-val" id="st-qa">0</div><div class="stat-lbl">Questions Asked</div></div>
+        <div class="stat-card"><div class="stat-ico">📄</div><div class="stat-val" id="st-pdf">0</div><div class="stat-lbl">PDFs Summarized</div></div>
+        <div class="stat-card"><div class="stat-ico">🧠</div><div class="stat-val" id="st-quiz">0</div><div class="stat-lbl">Quizzes Taken</div></div>
+        <div class="stat-card"><div class="stat-ico">✅</div><div class="stat-val" id="st-tasks">0</div><div class="stat-lbl">Tasks Completed</div></div>
+      </div>
+      <div class="sh"><h2 style="font-size:18px">Quick Actions</h2></div>
+      <div class="quick-grid">
+        <button class="qbtn" onclick="go('qa')"><div class="qi">💬</div><div class="ql">Ask a Question</div><div class="qd">Get AI answers instantly</div></button>
+        <button class="qbtn" onclick="go('pdf')"><div class="qi">📄</div><div class="ql">Summarize PDF</div><div class="qd">Upload &amp; get a summary</div></button>
+        <button class="qbtn" onclick="go('quiz')"><div class="qi">🧠</div><div class="ql">Take a Quiz</div><div class="qd">Test your knowledge</div></button>
+        <button class="qbtn" onclick="go('planner')"><div class="qi">📅</div><div class="ql">Study Planner</div><div class="qd">Organize your schedule</div></button>
+        <button class="qbtn" onclick="go('reminders')"><div class="qi">🔔</div><div class="ql">Set Reminder</div><div class="qd">Never miss a session</div></button>
+      </div>
+    </section>
+    <section class="cs" id="s-qa">
+      <div class="sh"><h2>💬 Ask AI</h2><p>Ask any academic question and get a detailed AI answer.</p></div>
+      <div class="card">
+        <div class="chat-box" id="chat-box">
+          <div class="empty"><div class="eico">🤖</div><p>Ask any academic question below.<br>I'm here to help you learn!</p></div>
+        </div>
+        <div style="margin-bottom:10px">
+          <select class="inp" id="qa-subject" style="width:100%">
+            <option value="">All Subjects</option>
+            <option>Mathematics</option><option>Physics</option><option>Chemistry</option>
+            <option>Biology</option><option>History</option><option>Literature</option>
+            <option>Computer Science</option><option>Economics</option><option>Geography</option><option>Other</option>
+          </select>
+        </div>
+        <div class="chat-row">
+          <input type="text" id="qa-inp" placeholder="Type your question..." onkeydown="if(event.key==='Enter')sendQ()">
+          <button class="btn btn-primary btn-sm" id="qa-btn" onclick="sendQ()" style="white-space:nowrap;width:auto;padding:12px 20px">Ask AI</button>
+        </div>
+      </div>
+    </section>
+    <section class="cs" id="s-pdf">
+      <div class="sh"><h2>📄 PDF Summarizer</h2><p>Upload any PDF and get an instant AI summary.</p></div>
+      <div class="upload-zone" id="drop-zone" onclick="document.getElementById('pdf-inp').click()"
+           ondragover="event.preventDefault();this.classList.add('over')"
+           ondragleave="this.classList.remove('over')"
+           ondrop="dropPDF(event)">
+        <div class="uico">📁</div>
+        <div class="utitle">Drop your PDF here, or click to browse</div>
+        <div class="uhint">PDF files up to 10MB</div>
+      </div>
+      <input type="file" id="pdf-inp" accept=".pdf" class="hidden" onchange="pickPDF(event)">
+      <div id="pdf-info" class="hidden card mb16">
+        <div class="flex ac gap12">
+          <span style="font-size:24px">📄</span>
+          <div style="flex:1"><div id="pdf-name" style="font-weight:600;font-size:14px"></div><div id="pdf-size" style="font-size:12px;color:var(--text2)"></div></div>
+          <button class="btn btn-primary btn-sm" id="sum-btn" onclick="doSummarize()">Summarize</button>
+        </div>
+      </div>
+      <div id="pdf-result" class="hidden card">
+        <div class="card-title">📝 AI Summary</div>
+        <div class="summary-out" id="sum-out"></div>
+        <div style="margin-top:12px;display:flex;gap:8px">
+          <button class="btn btn-secondary btn-sm" onclick="navigator.clipboard.writeText(document.getElementById('sum-out').textContent).then(()=>toast('Copied!','success'))">📋 Copy</button>
+          <button class="btn btn-secondary btn-sm" onclick="go('qa');document.getElementById('qa-inp').focus()">💬 Ask about this PDF</button>
+        </div>
+      </div>
+    </section>
+    <section class="cs" id="s-quiz">
+      <div class="sh"><h2>🧠 Quiz Generator</h2><p>Generate an AI quiz on any topic to test your knowledge.</p></div>
+      <div id="quiz-setup">
+        <div class="card">
+          <div class="fg"><label>Topic</label><input type="text" id="q-topic" placeholder="e.g. Photosynthesis, World War 2, Algebra..." style="width:100%;padding:12px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;outline:none"></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+            <div class="fg" style="margin:0"><label>Questions</label>
+              <select class="inp" id="q-count" style="width:100%"><option value="5">5 questions</option><option value="10" selected>10 questions</option><option value="15">15 questions</option><option value="20">20 questions</option></select>
+            </div>
+            <div class="fg" style="margin:0"><label>Type</label>
+              <select class="inp" id="q-type" style="width:100%"><option value="multiple_choice">Multiple Choice</option><option value="true_false">True / False</option></select>
+            </div>
+          </div>
+          <button class="btn btn-primary" id="gen-btn" onclick="genQuiz()">🧠 Generate Quiz</button>
+        </div>
+      </div>
+      <div id="quiz-active" class="hidden">
+        <div class="flex jb ac mb16">
+          <div><span id="q-title" style="font-weight:700;font-size:16px"></span><span id="q-count-lbl" style="font-size:13px;color:var(--text2);margin-left:8px"></span></div>
+          <button class="btn btn-secondary btn-sm" onclick="resetQuiz()">✕ Cancel</button>
+        </div>
+        <div id="q-container"></div>
+        <button class="btn btn-primary wfull" id="submit-btn" onclick="submitQuiz()">Submit Quiz</button>
+      </div>
+      <div id="quiz-result" class="hidden">
+        <div class="card score-wrap">
+          <div class="score-circle"><div class="score-n" id="score-pct">0%</div><div class="score-l">Score</div></div>
+          <h3 id="score-msg" style="font-size:18px;font-weight:700;margin-bottom:8px"></h3>
+          <p id="score-sub" style="color:var(--text2);font-size:14px;margin-bottom:20px"></p>
+          <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+            <button class="btn btn-primary btn-sm" onclick="resetQuiz()">Try Another</button>
+            <button class="btn btn-secondary btn-sm" onclick="showReview()">Review Answers</button>
+          </div>
+        </div>
+        <div id="review-box" class="hidden mt16"></div>
+      </div>
+    </section>
+    <section class="cs" id="s-planner">
+      <div class="sh"><h2>📅 Study Planner</h2><p>Organize your study schedule and track your goals.</p></div>
+      <div class="card mb16">
+        <div class="card-title">➕ Add Task</div>
+        <div class="task-form">
+          <input type="text" id="t-title" placeholder="What do you need to study?">
+          <select id="t-subj"><option value="other">Subject</option><option value="math">Mathematics</option><option value="science">Science</option><option value="history">History</option><option value="english">English</option><option value="other">Other</option></select>
+          <input type="date" id="t-due">
+          <button class="btn btn-primary btn-sm" onclick="addTask()" style="white-space:nowrap">Add Task</button>
+        </div>
+      </div>
+      <div id="prog-card" class="card mb16 hidden">
+        <div class="flex jb ac mb16"><span style="font-weight:600;font-size:14px">Progress</span><span id="prog-lbl" style="font-size:13px;color:var(--text2)">0/0</span></div>
+        <div class="prog-bar"><div class="prog-fill" id="prog-fill" style="width:0%"></div></div>
+      </div>
+      <div class="card">
+        <div class="card-title">📋 My Tasks</div>
+        <div class="task-list" id="task-list"><div class="empty"><div class="eico">📅</div><p>No tasks yet.</p></div></div>
+      </div>
+    </section>
+    <section class="cs" id="s-reminders">
+      <div class="sh"><h2>🔔 Reminder Assistant</h2><p>Set reminders for study sessions and deadlines.</p></div>
+      <div class="card mb16">
+        <div class="card-title">➕ New Reminder</div>
+        <div class="rem-form">
+          <div><label>Reminder</label><input type="text" id="r-msg" placeholder="e.g. Study for Chemistry exam"></div>
+          <div><label>Date &amp; Time</label><input type="datetime-local" id="r-time"></div>
+          <button class="btn btn-primary" onclick="addReminder()" style="height:42px;width:auto;padding:0 20px">Set</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">🔔 My Reminders</div>
+        <div class="rem-list" id="rem-list"><div class="empty"><div class="eico">🔔</div><p>No reminders set.</p></div></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div id="toasts"></div>
+
+<script>
+const API = 'http://localhost:5000/api';
+let token = localStorage.getItem('token');
+let user = null;
+let isDark = localStorage.getItem('theme') !== 'light';
+let quizData = [], answers = [];
+let stats = {qa:0, pdf:0, quiz:0, tasks:0};
+
+function applyTheme(){document.body.className=isDark?'dark':'light';document.getElementById('theme-btn').textContent=isDark?'☀️':'🌙'}
+function toggleTheme(){isDark=!isDark;localStorage.setItem('theme',isDark?'dark':'light');applyTheme()}
+function toast(msg,type='info'){const c=document.getElementById('toasts');const d=document.createElement('div');d.className='toast t-'+type;d.textContent=msg;c.appendChild(d);setTimeout(()=>d.remove(),3500)}
+async function call(url,opts={}){const h={'Content-Type':'application/json'};if(token)h['Authorization']='Bearer '+token;const r=await fetch(API+url,{...opts,headers:{...h,...(opts.headers||{})}});const d=await r.json();if(!r.ok)throw new Error(d.error||'Request failed');return d}
+function setBtn(id,loading,label){const b=document.getElementById(id);if(!b)return;b.disabled=loading;b.innerHTML=loading?'<span class="spin"></span> '+label:label}
+function showTab(t){document.getElementById('login-form').classList.toggle('hidden',t!=='login');document.getElementById('reg-form').classList.toggle('hidden',t!=='register');document.querySelectorAll('.auth-tab').forEach((el,i)=>el.classList.toggle('active',(i===0&&t==='login')||(i===1&&t==='register')))}
+async function doLogin(){const email=document.getElementById('le').value.trim();const pw=document.getElementById('lp').value;if(!email||!pw)return toast('Please fill all fields','error');setBtn('login-btn',true,'Signing in...');try{const d=await call('/login',{method:'POST',body:JSON.stringify({email,password:pw})});token=d.token;localStorage.setItem('token',token);user=d.user;enterApp()}catch(e){toast(e.message,'error')}finally{setBtn('login-btn',false,'Sign In')}}
+async function doRegister(){const name=document.getElementById('rn').value.trim();const email=document.getElementById('re').value.trim();const pw=document.getElementById('rp').value;const c=document.getElementById('rc').value;if(!name||!email||!pw||!c)return toast('Please fill all fields','error');if(pw!==c)return toast('Passwords do not match','error');if(pw.length<6)return toast('Password must be at least 6 characters','error');setBtn('reg-btn',true,'Creating...');try{const d=await call('/register',{method:'POST',body:JSON.stringify({name,email,password:pw})});token=d.token;localStorage.setItem('token',token);user=d.user;enterApp();toast('Welcome aboard!','success')}catch(e){toast(e.message,'error')}finally{setBtn('reg-btn',false,'Create Account')}}
+function doLogout(){token=null;user=null;localStorage.removeItem('token');document.getElementById('app').classList.add('hidden');document.getElementById('auth-screen').style.display='flex';toast('Logged out','info')}
+function enterApp(){document.getElementById('auth-screen').style.display='none';document.getElementById('app').classList.remove('hidden');document.getElementById('u-name').textContent=user.name;document.getElementById('u-avatar').textContent=user.name[0].toUpperCase();loadStats();renderTasks();renderReminders();if('Notification'in window&&Notification.permission==='default')Notification.requestPermission();setInterval(checkReminders,60000)}
+function go(sec){document.querySelectorAll('.cs').forEach(s=>s.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));document.getElementById('s-'+sec).classList.add('active');document.getElementById('nav-'+sec).classList.add('active')}
+function loadStats(){const s=JSON.parse(localStorage.getItem('stats_'+(user?.id||''))||'{}');stats={qa:0,pdf:0,quiz:0,tasks:0,...s};renderStats()}
+function renderStats(){document.getElementById('st-qa').textContent=stats.qa;document.getElementById('st-pdf').textContent=stats.pdf;document.getElementById('st-quiz').textContent=stats.quiz;document.getElementById('st-tasks').textContent=stats.tasks}
+function saveStats(){localStorage.setItem('stats_'+(user?.id||''),JSON.stringify(stats))}
+function addMsg(text,isUser){const box=document.getElementById('chat-box');const empty=box.querySelector('.empty');if(empty)empty.remove();const d=document.createElement('div');d.className='msg '+(isUser?'user':'ai');d.innerHTML='<div class="mavatar">'+(isUser?'👤':'🤖')+'</div><div class="mbody">'+text.replace(/\n/g,'<br>')+'</div>';box.appendChild(d);box.scrollTop=box.scrollHeight}
+async function sendQ(){const inp=document.getElementById('qa-inp');const q=inp.value.trim();const subj=document.getElementById('qa-subject').value;if(!q)return toast('Please type a question','error');addMsg(q,true);inp.value='';const load=document.createElement('div');load.className='loading';load.innerHTML='<span class="spin-d"></span> AI is thinking...';document.getElementById('chat-box').appendChild(load);setBtn('qa-btn',true,'Asking...');try{const d=await call('/qa',{method:'POST',body:JSON.stringify({question:q,subject:subj})});load.remove();addMsg(d.answer,false);stats.qa++;renderStats();saveStats()}catch(e){load.remove();addMsg('Could not get answer. Make sure the backend server is running.',false);toast(e.message,'error')}finally{setBtn('qa-btn',false,'Ask AI')}}
+let pdfFile=null;
+function dropPDF(e){e.preventDefault();document.getElementById('drop-zone').classList.remove('over');const f=e.dataTransfer.files[0];if(f&&f.type==='application/pdf')setPDF(f);else toast('Please drop a PDF file','error')}
+function pickPDF(e){if(e.target.files[0])setPDF(e.target.files[0])}
+function setPDF(f){if(f.size>10*1024*1024)return toast('File too large (max 10MB)','error');pdfFile=f;document.getElementById('pdf-name').textContent=f.name;document.getElementById('pdf-size').textContent=(f.size/1024).toFixed(1)+' KB';document.getElementById('pdf-info').classList.remove('hidden');document.getElementById('pdf-result').classList.add('hidden')}
+async function doSummarize(){if(!pdfFile)return;setBtn('sum-btn',true,'Summarizing...');const fd=new FormData();fd.append('file',pdfFile);try{const r=await fetch(API+'/pdf/upload',{method:'POST',headers:{Authorization:'Bearer '+token},body:fd});const d=await r.json();if(!r.ok)throw new Error(d.error||'Upload failed');document.getElementById('sum-out').textContent=d.summary;document.getElementById('pdf-result').classList.remove('hidden');stats.pdf++;renderStats();saveStats()}catch(e){toast(e.message,'error')}finally{setBtn('sum-btn',false,'Summarize')}}
+async function genQuiz(){const topic=document.getElementById('q-topic').value.trim();const count=parseInt(document.getElementById('q-count').value);const type=document.getElementById('q-type').value;if(!topic)return toast('Please enter a topic','error');setBtn('gen-btn',true,'Generating...');try{const d=await call('/quiz/generate',{method:'POST',body:JSON.stringify({topic,count,type})});quizData=d.questions;answers=new Array(quizData.length).fill(null);renderQuiz(topic)}catch(e){toast(e.message,'error')}finally{setBtn('gen-btn',false,'🧠 Generate Quiz')}}
+function renderQuiz(topic){document.getElementById('quiz-setup').classList.add('hidden');document.getElementById('quiz-result').classList.add('hidden');document.getElementById('quiz-active').classList.remove('hidden');document.getElementById('q-title').textContent=topic;document.getElementById('q-count-lbl').textContent=quizData.length+' questions';const c=document.getElementById('q-container');c.innerHTML='';quizData.forEach((q,i)=>{const d=document.createElement('div');d.className='quiz-q';d.innerHTML='<div class="qnum">Question '+(i+1)+' of '+quizData.length+'</div><div class="qtext">'+q.question+'</div><div class="opts" id="opts-'+i+'">'+q.options.map((o,j)=>'<button class="opt" onclick="pick('+i+','+j+')" id="o-'+i+'-'+j+'">'+String.fromCharCode(65+j)+'. '+o+'</button>').join('')+'</div>';c.appendChild(d)})}
+function pick(qi,oi){answers[qi]=oi;document.querySelectorAll('#opts-'+qi+' .opt').forEach(b=>b.classList.remove('sel'));document.getElementById('o-'+qi+'-'+oi).classList.add('sel')}
+function submitQuiz(){const skipped=answers.filter(a=>a===null).length;if(skipped&&!confirm(skipped+' unanswered question(s). Submit anyway?'))return;let correct=0;quizData.forEach((q,i)=>{if(answers[i]===q.correct_index)correct++});const pct=Math.round((correct/quizData.length)*100);document.getElementById('quiz-active').classList.add('hidden');document.getElementById('quiz-result').classList.remove('hidden');document.getElementById('review-box').classList.add('hidden');document.getElementById('score-pct').textContent=pct+'%';let msg,sub;if(pct>=90){msg='🏆 Excellent!';sub=correct+'/'+quizData.length+' correct. Outstanding!'}else if(pct>=70){msg='🎉 Great Job!';sub=correct+'/'+quizData.length+' correct. Keep it up!'}else if(pct>=50){msg='📚 Good Effort';sub=correct+'/'+quizData.length+' correct. Review and retry.'}else{msg='💪 Keep Practicing';sub=correct+'/'+quizData.length+' correct. More study needed!'}document.getElementById('score-msg').textContent=msg;document.getElementById('score-sub').textContent=sub;stats.quiz++;renderStats();saveStats()}
+function showReview(){const box=document.getElementById('review-box');box.classList.remove('hidden');box.innerHTML='<h3 style="font-weight:700;margin-bottom:16px">Review Answers</h3>';quizData.forEach((q,i)=>{const d=document.createElement('div');d.className='quiz-q';d.innerHTML='<div class="qnum">Question '+(i+1)+'</div><div class="qtext">'+q.question+'</div><div class="opts">'+q.options.map((o,j)=>{let cls='opt';if(j===q.correct_index)cls+=' correct';else if(j===answers[i]&&answers[i]!==q.correct_index)cls+=' wrong';return'<button class="'+cls+'" disabled>'+String.fromCharCode(65+j)+'. '+o+'</button>'}).join('')+'</div>'+(q.explanation?'<div class="expl">💡 '+q.explanation+'</div>':'');box.appendChild(d)})}
+function resetQuiz(){quizData=[];answers=[];document.getElementById('quiz-setup').classList.remove('hidden');document.getElementById('quiz-active').classList.add('hidden');document.getElementById('quiz-result').classList.add('hidden')}
+const TK=()=>'tasks_'+(user?.id||'');
+const getTasks=()=>JSON.parse(localStorage.getItem(TK())||'[]');
+const saveTasks=t=>localStorage.setItem(TK(),JSON.stringify(t));
+function addTask(){const title=document.getElementById('t-title').value.trim();const subj=document.getElementById('t-subj').value;const due=document.getElementById('t-due').value;if(!title)return toast('Please enter a task','error');const tasks=getTasks();tasks.unshift({id:Date.now(),title,subj,due:due||null,done:false});saveTasks(tasks);document.getElementById('t-title').value='';document.getElementById('t-due').value='';renderTasks();toast('Task added!','success')}
+function toggleTask(id){const tasks=getTasks(),t=tasks.find(x=>x.id===id);if(!t)return;t.done=!t.done;saveTasks(tasks);stats.tasks=tasks.filter(x=>x.done).length;renderStats();saveStats();renderTasks()}
+function delTask(id){saveTasks(getTasks().filter(t=>t.id!==id));renderTasks()}
+function renderTasks(){const tasks=getTasks();const list=document.getElementById('task-list');const pc=document.getElementById('prog-card');if(!tasks.length){list.innerHTML='<div class="empty"><div class="eico">📅</div><p>No tasks yet.</p></div>';pc.classList.add('hidden');return}pc.classList.remove('hidden');const done=tasks.filter(t=>t.done).length;const pct=Math.round(done/tasks.length*100);document.getElementById('prog-lbl').textContent=done+' / '+tasks.length+' done';document.getElementById('prog-fill').style.width=pct+'%';const bm={math:'bm',science:'bs',history:'bh',english:'be',other:'bo'};const sl={math:'Math',science:'Science',history:'History',english:'English',other:'Other'};list.innerHTML=tasks.map(t=>'<div class="task '+(t.done?'done':'')+'"><div class="tcheck '+(t.done?'on':'')+'" onclick="toggleTask('+t.id+')">'+(t.done?'✓':'')+'</div><div class="tinfo"><div class="ttitle">'+t.title+'</div><div class="tmeta">'+(t.due?'📅 Due: '+new Date(t.due+'T00:00').toLocaleDateString():'No deadline')+'</div></div><span class="badge '+(bm[t.subj]||'bo')+'">'+(sl[t.subj]||'Other')+'</span><button class="btn btn-secondary btn-sm" onclick="delTask('+t.id+')">✕</button></div>').join('')}
+const RK=()=>'rems_'+(user?.id||'');
+const getRems=()=>JSON.parse(localStorage.getItem(RK())||'[]');
+const saveRems=r=>localStorage.setItem(RK(),JSON.stringify(r));
+function addReminder(){const msg=document.getElementById('r-msg').value.trim();const time=document.getElementById('r-time').value;if(!msg)return toast('Please enter a message','error');if(!time)return toast('Please set a date and time','error');const rems=getRems();rems.unshift({id:Date.now(),message:msg,time:new Date(time).toISOString(),done:false});saveRems(rems);document.getElementById('r-msg').value='';document.getElementById('r-time').value='';renderReminders();toast('Reminder set!','success')}
+function dismissRem(id){const r=getRems(),x=r.find(x=>x.id===id);if(x)x.done=true;saveRems(r);renderReminders();toast('Reminder dismissed','info')}
+function delRem(id){saveRems(getRems().filter(r=>r.id!==id));renderReminders()}
+function renderReminders(){const rems=getRems();const list=document.getElementById('rem-list');if(!rems.length){list.innerHTML='<div class="empty"><div class="eico">🔔</div><p>No reminders set.</p></div>';return}const now=new Date();list.innerHTML=rems.map(r=>{const t=new Date(r.time),past=t<now;let sc,st;if(r.done){sc='sdone';st='Done'}else if(past){sc='sdue';st='Overdue'}else{sc='sup';st='Upcoming'}return'<div class="rem '+(r.done?'done':'')+'"><span style="font-size:20px">🔔</span><div class="rinfo"><div class="rmsg">'+r.message+'</div><div class="rtime">📅 '+t.toLocaleString()+'</div></div><span class="rstatus '+sc+'">'+st+'</span>'+(!r.done?'<button class="btn btn-secondary btn-sm" onclick="dismissRem('+r.id+')">✓ Done</button>':'')+'<button class="btn btn-secondary btn-sm" onclick="delRem('+r.id+')">✕</button></div>'}).join('')}
+function checkReminders(){const now=new Date();getRems().filter(r=>!r.done&&new Date(r.time)<=now).forEach(r=>toast('🔔 '+r.message,'info'))}
+async function init(){applyTheme();if(token){try{const d=await call('/me');user=d.user;enterApp()}catch{token=null;localStorage.removeItem('token')}}}
+init();
+</script>
+</body>
+</html>
