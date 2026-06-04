@@ -3,7 +3,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 import bcrypt
-import google.generativeai as genai
+from google import genai
 import pdfplumber
 from datetime import timedelta
 from dotenv import load_dotenv
@@ -17,8 +17,7 @@ app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET', 'change-this-secret-
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(days=7)
 JWTManager(app)
 
-genai.configure(api_key=os.environ.get('GEMINI_API_KEY'))
-ai = genai.GenerativeModel('gemini-2.0-flash')
+ai = genai.Client(api_key=os.environ.get('GEMINI_API_KEY'))
 
 DB = 'academic.db'
 
@@ -131,7 +130,7 @@ def qa():
             f'explaining concepts so the student truly understands.\n\n'
             f'Question: {question}'
         )
-        response = ai.generate_content(prompt)
+        response = ai.models.generate_content(model='gemini-2.0-flash', contents=prompt)
         return jsonify({'answer': response.text})
     except Exception as e:
         err = str(e)
@@ -169,7 +168,7 @@ def upload_pdf():
             '1. Main Topic\n2. Key Concepts\n3. Important Details\n4. Conclusions\n\n'
             f'Text:\n{text[:8000]}'
         )
-        response = ai.generate_content(prompt)
+        response = ai.models.generate_content(model='gemini-2.0-flash', contents=prompt)
         return jsonify({'summary': response.text, 'text': text[:5000]})
     except Exception as e:
         err = str(e)
@@ -211,7 +210,7 @@ def generate_quiz():
     )
 
     try:
-        response = ai.generate_content(prompt)
+        response = ai.models.generate_content(model='gemini-2.0-flash', contents=prompt)
     except Exception as e:
         err = str(e)
         if 'quota' in err.lower() or '429' in err:
