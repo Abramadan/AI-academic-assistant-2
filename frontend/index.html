@@ -405,6 +405,7 @@ let user = null;
 let isDark = localStorage.getItem('theme') !== 'light';
 let quizData = [], answers = [];
 let stats = {qa:0, pdf:0, quiz:0, tasks:0};
+let tasks = [], reminders = [];
 
 function applyTheme() {
   document.body.className = isDark ? 'dark' : 'light';
@@ -492,7 +493,7 @@ function enterApp() {
   document.getElementById('app').classList.remove('hidden');
   document.getElementById('u-name').textContent = user.name;
   document.getElementById('u-avatar').textContent = user.name[0].toUpperCase();
-  loadStats(); renderTasks(); renderReminders();
+  loadStats(); loadTasks(); loadReminders();
   if ('Notification' in window && Notification.permission==='default') Notification.requestPermission();
   setInterval(checkReminders, 60000);
 }
@@ -669,34 +670,47 @@ function resetQuiz() {
 }
 
 // PLANNER
-const TK = () => 'tasks_'+(user?.id||'');
-const getTasks = () => JSON.parse(localStorage.getItem(TK())||'[]');
-const saveTasks = t => localStorage.setItem(TK(), JSON.stringify(t));
+async function loadTasks() {
+  try {
+    const d = await call('/tasks');
+    tasks = d.tasks;
+    stats.tasks = tasks.filter(t=>t.done).length;
+    renderStats(); saveStats();
+    renderTasks();
+  } catch(e) { toast('Could not load tasks','error'); }
+}
 
-function addTask() {
+async function addTask() {
   const title = document.getElementById('t-title').value.trim();
-  const subj = document.getElementById('t-subj').value;
-  const due = document.getElementById('t-due').value;
+  const subject = document.getElementById('t-subj').value;
+  const due_date = document.getElementById('t-due').value || null;
   if (!title) return toast('Please enter a task','error');
-  const tasks = getTasks();
-  tasks.unshift({id:Date.now(), title, subj, due:due||null, done:false});
-  saveTasks(tasks);
-  document.getElementById('t-title').value='';
-  document.getElementById('t-due').value='';
-  renderTasks(); toast('Task added!','success');
+  try {
+    await call('/tasks', {method:'POST', body:JSON.stringify({title, subject, due_date})});
+    document.getElementById('t-title').value='';
+    document.getElementById('t-due').value='';
+    toast('Task added!','success');
+    await loadTasks();
+  } catch(e) { toast(e.message,'error'); }
 }
 
-function toggleTask(id) {
-  const tasks = getTasks(), t = tasks.find(x=>x.id===id);
-  if (!t) return; t.done = !t.done; saveTasks(tasks);
-  stats.tasks = tasks.filter(x=>x.done).length;
-  renderStats(); saveStats(); renderTasks();
+async function toggleTask(id) {
+  const t = tasks.find(x=>x.id===id);
+  if (!t) return;
+  try {
+    await call('/tasks/'+id, {method:'PATCH', body:JSON.stringify({done:!t.done})});
+    await loadTasks();
+  } catch(e) { toast(e.message,'error'); }
 }
 
-function delTask(id) { saveTasks(getTasks().filter(t=>t.id!==id)); renderTasks(); }
+async function delTask(id) {
+  try {
+    await call('/tasks/'+id, {method:'DELETE'});
+    await loadTasks();
+  } catch(e) { toast(e.message,'error'); }
+}
 
 function renderTasks() {
-  const tasks = getTasks();
   const list = document.getElementById('task-list');
   const pc = document.getElementById('prog-card');
   if (!tasks.length) {
@@ -713,45 +727,57 @@ function renderTasks() {
   list.innerHTML = tasks.map(t =>
     '<div class="task ' + (t.done?'done':'') + '">' +
     '<div class="tcheck ' + (t.done?'on':'') + '" onclick="toggleTask(' + t.id + ')">' + (t.done?'✓':'') + '</div>' +
-    '<div class="tinfo"><div class="ttitle">' + t.title + '</div><div class="tmeta">' + (t.due?'📅 Due: '+new Date(t.due+'T00:00').toLocaleDateString():'No deadline') + '</div></div>' +
-    '<span class="badge ' + (bm[t.subj]||'bo') + '">' + (sl[t.subj]||'Other') + '</span>' +
+    '<div class="tinfo"><div class="ttitle">' + t.title + '</div><div class="tmeta">' + (t.due_date?'📅 Due: '+new Date(t.due_date+'T00:00').toLocaleDateString():'No deadline') + '</div></div>' +
+    '<span class="badge ' + (bm[t.subject]||'bo') + '">' + (sl[t.subject]||'Other') + '</span>' +
     '<button class="btn btn-secondary btn-sm" onclick="delTask(' + t.id + ')">✕</button>' +
     '</div>'
   ).join('');
 }
 
 // REMINDERS
-const RK = () => 'rems_'+(user?.id||'');
-const getRems = () => JSON.parse(localStorage.getItem(RK())||'[]');
-const saveRems = r => localStorage.setItem(RK(), JSON.stringify(r));
+async function loadReminders() {
+  try {
+    const d = await call('/reminders');
+    reminders = d.reminders;
+    renderReminders();
+  } catch(e) { toast('Could not load reminders','error'); }
+}
 
-function addReminder() {
-  const msg = document.getElementById('r-msg').value.trim();
+async function addReminder() {
+  const message = document.getElementById('r-msg').value.trim();
   const time = document.getElementById('r-time').value;
-  if (!msg) return toast('Please enter a message','error');
+  if (!message) return toast('Please enter a message','error');
   if (!time) return toast('Please set a date and time','error');
-  const rems = getRems();
-  rems.unshift({id:Date.now(), message:msg, time:new Date(time).toISOString(), done:false});
-  saveRems(rems);
-  document.getElementById('r-msg').value='';
-  document.getElementById('r-time').value='';
-  renderReminders(); toast('Reminder set!','success');
+  try {
+    await call('/reminders', {method:'POST', body:JSON.stringify({message, remind_at:new Date(time).toISOString()})});
+    document.getElementById('r-msg').value='';
+    document.getElementById('r-time').value='';
+    toast('Reminder set!','success');
+    await loadReminders();
+  } catch(e) { toast(e.message,'error'); }
 }
 
-function dismissRem(id) {
-  const r = getRems(), x = r.find(x=>x.id===id);
-  if (x) x.done = true; saveRems(r); renderReminders(); toast('Reminder dismissed','info');
+async function dismissRem(id) {
+  try {
+    await call('/reminders/'+id, {method:'PATCH', body:JSON.stringify({done:true})});
+    toast('Reminder dismissed','info');
+    await loadReminders();
+  } catch(e) { toast(e.message,'error'); }
 }
 
-function delRem(id) { saveRems(getRems().filter(r=>r.id!==id)); renderReminders(); }
+async function delRem(id) {
+  try {
+    await call('/reminders/'+id, {method:'DELETE'});
+    await loadReminders();
+  } catch(e) { toast(e.message,'error'); }
+}
 
 function renderReminders() {
-  const rems = getRems();
   const list = document.getElementById('rem-list');
-  if (!rems.length) { list.innerHTML='<div class="empty"><div class="eico">🔔</div><p>No reminders set.</p></div>'; return; }
+  if (!reminders.length) { list.innerHTML='<div class="empty"><div class="eico">🔔</div><p>No reminders set.</p></div>'; return; }
   const now = new Date();
-  list.innerHTML = rems.map(r => {
-    const t = new Date(r.time), past = t < now;
+  list.innerHTML = reminders.map(r => {
+    const t = new Date(r.remind_at), past = t < now;
     let sc, st;
     if (r.done){sc='sdone';st='Done'} else if(past){sc='sdue';st='Overdue'} else{sc='sup';st='Upcoming'}
     return '<div class="rem ' + (r.done?'done':'') + '">' +
@@ -766,7 +792,7 @@ function renderReminders() {
 
 function checkReminders() {
   const now = new Date();
-  getRems().filter(r => !r.done && new Date(r.time) <= now)
+  reminders.filter(r => !r.done && new Date(r.remind_at) <= now)
     .forEach(r => toast('🔔 ' + r.message, 'info'));
 }
 

@@ -35,6 +35,25 @@ def init_db():
         password_hash TEXT NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )''')
+    db.execute('''CREATE TABLE IF NOT EXISTS tasks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        subject TEXT DEFAULT 'other',
+        due_date TEXT,
+        done INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id)
+    )''')
+    db.execute('''CREATE TABLE IF NOT EXISTS reminders (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        message TEXT NOT NULL,
+        remind_at TEXT NOT NULL,
+        done INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id)
+    )''')
     db.commit()
     db.close()
 
@@ -226,6 +245,121 @@ def generate_quiz():
         return jsonify({'questions': questions})
     except Exception as e:
         return jsonify({'error': f'Failed to parse quiz: {str(e)}'}), 500
+
+# ── PLANNER ──────────────────────────────────────────────────
+
+@app.route('/api/tasks', methods=['GET'])
+@jwt_required()
+def get_tasks():
+    uid = get_jwt_identity()
+    db = get_db()
+    rows = db.execute('SELECT * FROM tasks WHERE user_id=? ORDER BY created_at DESC', (uid,)).fetchall()
+    db.close()
+    return jsonify({'tasks': [dict(r) for r in rows]})
+
+@app.route('/api/tasks', methods=['POST'])
+@jwt_required()
+def create_task():
+    uid = get_jwt_identity()
+    data = request.json or {}
+    title = data.get('title', '').strip()
+    subject = data.get('subject', 'other')
+    due_date = data.get('due_date') or None
+    if not title:
+        return jsonify({'error': 'Title is required'}), 400
+    db = get_db()
+    db.execute('INSERT INTO tasks (user_id, title, subject, due_date) VALUES (?,?,?,?)',
+               (uid, title, subject, due_date))
+    db.commit()
+    task = db.execute('SELECT * FROM tasks WHERE rowid=last_insert_rowid()').fetchone()
+    db.close()
+    return jsonify({'task': dict(task)}), 201
+
+@app.route('/api/tasks/<int:tid>', methods=['PATCH'])
+@jwt_required()
+def update_task(tid):
+    uid = get_jwt_identity()
+    data = request.json or {}
+    db = get_db()
+    task = db.execute('SELECT * FROM tasks WHERE id=? AND user_id=?', (tid, uid)).fetchone()
+    if not task:
+        db.close()
+        return jsonify({'error': 'Task not found'}), 404
+    done = data.get('done', bool(task['done']))
+    db.execute('UPDATE tasks SET done=? WHERE id=?', (int(done), tid))
+    db.commit()
+    updated = db.execute('SELECT * FROM tasks WHERE id=?', (tid,)).fetchone()
+    db.close()
+    return jsonify({'task': dict(updated)})
+
+@app.route('/api/tasks/<int:tid>', methods=['DELETE'])
+@jwt_required()
+def delete_task(tid):
+    uid = get_jwt_identity()
+    db = get_db()
+    r = db.execute('DELETE FROM tasks WHERE id=? AND user_id=?', (tid, uid))
+    db.commit()
+    db.close()
+    if r.rowcount == 0:
+        return jsonify({'error': 'Task not found'}), 404
+    return jsonify({'ok': True})
+
+# ── REMINDERS ────────────────────────────────────────────────
+
+@app.route('/api/reminders', methods=['GET'])
+@jwt_required()
+def get_reminders():
+    uid = get_jwt_identity()
+    db = get_db()
+    rows = db.execute('SELECT * FROM reminders WHERE user_id=? ORDER BY remind_at ASC', (uid,)).fetchall()
+    db.close()
+    return jsonify({'reminders': [dict(r) for r in rows]})
+
+@app.route('/api/reminders', methods=['POST'])
+@jwt_required()
+def create_reminder():
+    uid = get_jwt_identity()
+    data = request.json or {}
+    message = data.get('message', '').strip()
+    remind_at = data.get('remind_at', '').strip()
+    if not message or not remind_at:
+        return jsonify({'error': 'Message and remind_at are required'}), 400
+    db = get_db()
+    db.execute('INSERT INTO reminders (user_id, message, remind_at) VALUES (?,?,?)',
+               (uid, message, remind_at))
+    db.commit()
+    rem = db.execute('SELECT * FROM reminders WHERE rowid=last_insert_rowid()').fetchone()
+    db.close()
+    return jsonify({'reminder': dict(rem)}), 201
+
+@app.route('/api/reminders/<int:rid>', methods=['PATCH'])
+@jwt_required()
+def update_reminder(rid):
+    uid = get_jwt_identity()
+    data = request.json or {}
+    db = get_db()
+    rem = db.execute('SELECT * FROM reminders WHERE id=? AND user_id=?', (rid, uid)).fetchone()
+    if not rem:
+        db.close()
+        return jsonify({'error': 'Reminder not found'}), 404
+    done = data.get('done', bool(rem['done']))
+    db.execute('UPDATE reminders SET done=? WHERE id=?', (int(done), rid))
+    db.commit()
+    updated = db.execute('SELECT * FROM reminders WHERE id=?', (rid,)).fetchone()
+    db.close()
+    return jsonify({'reminder': dict(updated)})
+
+@app.route('/api/reminders/<int:rid>', methods=['DELETE'])
+@jwt_required()
+def delete_reminder(rid):
+    uid = get_jwt_identity()
+    db = get_db()
+    r = db.execute('DELETE FROM reminders WHERE id=? AND user_id=?', (rid, uid))
+    db.commit()
+    db.close()
+    if r.rowcount == 0:
+        return jsonify({'error': 'Reminder not found'}), 404
+    return jsonify({'ok': True})
 
 # ── MAIN ─────────────────────────────────────────────────────
 
