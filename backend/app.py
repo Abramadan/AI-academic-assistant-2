@@ -3,7 +3,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 import bcrypt
-from anthropic import Anthropic
+import google.generativeai as genai
 import pdfplumber
 from datetime import timedelta
 from dotenv import load_dotenv
@@ -17,7 +17,8 @@ app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET', 'change-this-secret-
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(days=7)
 JWTManager(app)
 
-ai = Anthropic(api_key=os.environ.get('ANTHROPIC_API_KEY'))
+genai.configure(api_key=os.environ.get('GEMINI_API_KEY'))
+ai = genai.GenerativeModel('gemini-2.0-flash')
 
 DB = 'academic.db'
 
@@ -124,24 +125,18 @@ def qa():
 
     ctx = f' This is a {subject} question.' if subject else ''
     try:
-        msg = ai.messages.create(
-            model='claude-sonnet-4-6',
-            max_tokens=1024,
-            messages=[{
-                'role': 'user',
-                'content': (
-                    f'You are an expert academic tutor.{ctx} '
-                    f'Answer the following question clearly and accurately, '
-                    f'explaining concepts so the student truly understands.\n\n'
-                    f'Question: {question}'
-                )
-            }]
+        prompt = (
+            f'You are an expert academic tutor.{ctx} '
+            f'Answer the following question clearly and accurately, '
+            f'explaining concepts so the student truly understands.\n\n'
+            f'Question: {question}'
         )
-        return jsonify({'answer': msg.content[0].text})
+        response = ai.generate_content(prompt)
+        return jsonify({'answer': response.text})
     except Exception as e:
         err = str(e)
-        if 'credit balance is too low' in err or 'billing' in err.lower():
-            return jsonify({'error': 'Anthropic API has no credits. Please add credits at console.anthropic.com → Plans & Billing.'}), 402
+        if 'quota' in err.lower() or '429' in err:
+            return jsonify({'error': 'Gemini API quota exceeded. Check aistudio.google.com for your usage.'}), 429
         return jsonify({'error': f'AI error: {err}'}), 500
 
 # ── PDF ─────────────────────────────────────────────────────
@@ -168,24 +163,18 @@ def upload_pdf():
         return jsonify({'error': 'Could not extract text from this PDF'}), 400
 
     try:
-        msg = ai.messages.create(
-            model='claude-sonnet-4-6',
-            max_tokens=1500,
-            messages=[{
-                'role': 'user',
-                'content': (
-                    'Please provide a comprehensive academic summary of the following text. '
-                    'Structure your response with these sections:\n'
-                    '1. Main Topic\n2. Key Concepts\n3. Important Details\n4. Conclusions\n\n'
-                    f'Text:\n{text[:8000]}'
-                )
-            }]
+        prompt = (
+            'Please provide a comprehensive academic summary of the following text. '
+            'Structure your response with these sections:\n'
+            '1. Main Topic\n2. Key Concepts\n3. Important Details\n4. Conclusions\n\n'
+            f'Text:\n{text[:8000]}'
         )
-        return jsonify({'summary': msg.content[0].text, 'text': text[:5000]})
+        response = ai.generate_content(prompt)
+        return jsonify({'summary': response.text, 'text': text[:5000]})
     except Exception as e:
         err = str(e)
-        if 'credit balance is too low' in err or 'billing' in err.lower():
-            return jsonify({'error': 'Anthropic API has no credits. Please add credits at console.anthropic.com → Plans & Billing.'}), 402
+        if 'quota' in err.lower() or '429' in err:
+            return jsonify({'error': 'Gemini API quota exceeded. Check aistudio.google.com for your usage.'}), 429
         return jsonify({'error': f'AI error: {err}'}), 500
 
 # ── QUIZ ─────────────────────────────────────────────────────
@@ -222,18 +211,14 @@ def generate_quiz():
     )
 
     try:
-        msg = ai.messages.create(
-            model='claude-sonnet-4-6',
-            max_tokens=3000,
-            messages=[{'role': 'user', 'content': prompt}]
-        )
+        response = ai.generate_content(prompt)
     except Exception as e:
         err = str(e)
-        if 'credit balance is too low' in err or 'billing' in err.lower():
-            return jsonify({'error': 'Anthropic API has no credits. Please add credits at console.anthropic.com → Plans & Billing.'}), 402
+        if 'quota' in err.lower() or '429' in err:
+            return jsonify({'error': 'Gemini API quota exceeded. Check aistudio.google.com for your usage.'}), 429
         return jsonify({'error': f'AI error: {err}'}), 500
 
-    raw = msg.content[0].text.strip()
+    raw = response.text.strip()
     if '```' in raw:
         raw = raw.split('```')[1]
         if raw.startswith('json'):

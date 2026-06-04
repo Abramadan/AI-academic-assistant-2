@@ -2,6 +2,6 @@ flask
 flask-cors
 flask-jwt-extended
 bcrypt
-anthropic
+google-generativeai
 pdfplumber
 python-dotenv
