@@ -5,3 +5,4 @@ bcrypt
 groq
 pdfplumber
 python-dotenv
+gunicorn
