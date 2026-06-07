@@ -5,3 +5,4 @@ bcrypt
 anthropic
 pdfplumber
 python-dotenv
+gunicorn
