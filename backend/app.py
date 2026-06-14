@@ -1,5 +1,5 @@
 import os, json, io, sqlite3
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 import bcrypt
@@ -19,7 +19,9 @@ JWTManager(app)
 
 ai = Groq(api_key=os.environ.get('GROQ_API_KEY'))
 
-DB = 'academic.db'
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB = os.path.join(BASE_DIR, 'academic.db')
+FRONTEND = os.path.join(BASE_DIR, '..', 'frontend', 'index.html')
 
 def get_db():
     db = sqlite3.connect(DB)
@@ -71,9 +73,14 @@ def register():
     if len(password) < 6:
         return jsonify({'error': 'Password must be at least 6 characters'}), 400
 
+    db = get_db()
+    user_count = db.execute('SELECT COUNT(*) FROM users').fetchone()[0]
+    if user_count >= 50:
+        db.close()
+        return jsonify({'error': 'Registration is closed. This app has reached its maximum capacity of 50 users.'}), 403
+
     pw_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
     try:
-        db = get_db()
         db.execute('INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?)',
                    (name, email, pw_hash))
         db.commit()
@@ -82,6 +89,7 @@ def register():
         token = create_access_token(identity=str(user['id']))
         return jsonify({'token': token, 'user': dict(user)})
     except sqlite3.IntegrityError:
+        db.close()
         return jsonify({'error': 'Email already registered'}), 409
 
 @app.route('/api/login', methods=['POST'])
@@ -354,9 +362,25 @@ def delete_reminder(rid):
         return jsonify({'error': 'Reminder not found'}), 404
     return jsonify({'ok': True})
 
+# ── FRONTEND ─────────────────────────────────────────────────
+
+@app.route('/')
+def index():
+    return send_file(FRONTEND)
+
+# ── ADMIN ────────────────────────────────────────────────────
+
+@app.route('/api/admin/stats', methods=['GET'])
+def admin_stats():
+    db = get_db()
+    count = db.execute('SELECT COUNT(*) FROM users').fetchone()[0]
+    db.close()
+    return jsonify({'registered_users': count, 'max_users': 50, 'slots_remaining': 50 - count})
+
 # ── MAIN ─────────────────────────────────────────────────────
 
 if __name__ == '__main__':
     init_db()
     print('\nAI Academic Assistant backend running at http://localhost:5000\n')
-    app.run(debug=True, port=5000)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(debug=False, threaded=True, host='0.0.0.0', port=port)
