@@ -17,14 +17,22 @@ app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET', 'change-this-secret-
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(days=7)
 JWTManager(app)
 
-ai = Groq(api_key=os.environ.get('GROQ_API_KEY'))
-
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB = os.path.join(BASE_DIR, 'academic.db')
+DB = os.environ.get('DB_PATH', os.path.join(BASE_DIR, 'academic.db'))
 FRONTEND = os.path.join(BASE_DIR, '..', 'frontend', 'index.html')
 
+_groq = None
+def get_ai():
+    global _groq
+    if _groq is None:
+        key = os.environ.get('GROQ_API_KEY')
+        if not key:
+            raise RuntimeError('GROQ_API_KEY is not configured')
+        _groq = Groq(api_key=key)
+    return _groq
+
 def get_db():
-    db = sqlite3.connect(DB)
+    db = sqlite3.connect(DB, check_same_thread=False)
     db.row_factory = sqlite3.Row
     return db
 
@@ -59,6 +67,9 @@ def init_db():
     db.commit()
     db.close()
 
+# Called at module load — runs for both direct execution and Gunicorn
+init_db()
+
 # ── AUTH ────────────────────────────────────────────────────
 
 @app.route('/api/register', methods=['POST'])
@@ -70,6 +81,8 @@ def register():
 
     if not name or not email or not password:
         return jsonify({'error': 'All fields are required'}), 400
+    if len(name) > 100:
+        return jsonify({'error': 'Name is too long'}), 400
     if len(password) < 6:
         return jsonify({'error': 'Password must be at least 6 characters'}), 400
 
@@ -129,6 +142,8 @@ def qa():
     subject = data.get('subject', '')
     if not question:
         return jsonify({'error': 'Question is required'}), 400
+    if len(question) > 2000:
+        return jsonify({'error': 'Question is too long (max 2000 characters)'}), 400
 
     ctx = f' This is a {subject} question.' if subject else ''
     try:
@@ -138,15 +153,17 @@ def qa():
             f'explaining concepts so the student truly understands.\n\n'
             f'Question: {question}'
         )
-        response = ai.chat.completions.create(
+        response = get_ai().chat.completions.create(
             model='meta-llama/llama-4-scout-17b-16e-instruct',
             messages=[{'role': 'user', 'content': prompt}]
         )
         return jsonify({'answer': response.choices[0].message.content})
+    except RuntimeError as e:
+        return jsonify({'error': str(e)}), 503
     except Exception as e:
         err = str(e)
         if 'rate_limit' in err.lower() or '429' in err:
-            return jsonify({'error': 'Groq rate limit reached. Try again in a moment.'}), 429
+            return jsonify({'error': 'AI rate limit reached. Please try again in a moment.'}), 429
         return jsonify({'error': f'AI error: {err}'}), 500
 
 # ── PDF ─────────────────────────────────────────────────────
@@ -179,15 +196,17 @@ def upload_pdf():
             '1. Main Topic\n2. Key Concepts\n3. Important Details\n4. Conclusions\n\n'
             f'Text:\n{text[:8000]}'
         )
-        response = ai.chat.completions.create(
+        response = get_ai().chat.completions.create(
             model='meta-llama/llama-4-scout-17b-16e-instruct',
             messages=[{'role': 'user', 'content': prompt}]
         )
         return jsonify({'summary': response.choices[0].message.content, 'text': text[:5000]})
+    except RuntimeError as e:
+        return jsonify({'error': str(e)}), 503
     except Exception as e:
         err = str(e)
         if 'rate_limit' in err.lower() or '429' in err:
-            return jsonify({'error': 'Groq rate limit reached. Try again in a moment.'}), 429
+            return jsonify({'error': 'AI rate limit reached. Please try again in a moment.'}), 429
         return jsonify({'error': f'AI error: {err}'}), 500
 
 # ── QUIZ ─────────────────────────────────────────────────────
@@ -202,6 +221,8 @@ def generate_quiz():
 
     if not topic:
         return jsonify({'error': 'Topic is required'}), 400
+    if len(topic) > 300:
+        return jsonify({'error': 'Topic is too long (max 300 characters)'}), 400
 
     if qtype == 'true_false':
         fmt = 'Each question is a statement that is True or False. Options must be exactly ["True", "False"].'
@@ -224,14 +245,16 @@ def generate_quiz():
     )
 
     try:
-        response = ai.chat.completions.create(
+        response = get_ai().chat.completions.create(
             model='meta-llama/llama-4-scout-17b-16e-instruct',
             messages=[{'role': 'user', 'content': prompt}]
         )
+    except RuntimeError as e:
+        return jsonify({'error': str(e)}), 503
     except Exception as e:
         err = str(e)
         if 'rate_limit' in err.lower() or '429' in err:
-            return jsonify({'error': 'Groq rate limit reached. Try again in a moment.'}), 429
+            return jsonify({'error': 'AI rate limit reached. Please try again in a moment.'}), 429
         return jsonify({'error': f'AI error: {err}'}), 500
 
     raw = response.choices[0].message.content.strip()
@@ -245,7 +268,7 @@ def generate_quiz():
         questions = json.loads(raw.strip())
         return jsonify({'questions': questions})
     except Exception as e:
-        return jsonify({'error': f'Failed to parse quiz: {str(e)}'}), 500
+        return jsonify({'error': f'Failed to parse quiz response: {str(e)}'}), 500
 
 # ── PLANNER ──────────────────────────────────────────────────
 
@@ -268,6 +291,8 @@ def create_task():
     due_date = data.get('due_date') or None
     if not title:
         return jsonify({'error': 'Title is required'}), 400
+    if len(title) > 300:
+        return jsonify({'error': 'Title is too long'}), 400
     db = get_db()
     db.execute('INSERT INTO tasks (user_id, title, subject, due_date) VALUES (?,?,?,?)',
                (uid, title, subject, due_date))
@@ -325,6 +350,8 @@ def create_reminder():
     remind_at = data.get('remind_at', '').strip()
     if not message or not remind_at:
         return jsonify({'error': 'Message and remind_at are required'}), 400
+    if len(message) > 500:
+        return jsonify({'error': 'Message is too long'}), 400
     db = get_db()
     db.execute('INSERT INTO reminders (user_id, message, remind_at) VALUES (?,?,?)',
                (uid, message, remind_at))
@@ -380,7 +407,6 @@ def admin_stats():
 # ── MAIN ─────────────────────────────────────────────────────
 
 if __name__ == '__main__':
-    init_db()
-    print('\nAI Academic Assistant backend running at http://localhost:5000\n')
+    print('\nAI Academic Assistant running at http://localhost:5000\n')
     port = int(os.environ.get('PORT', 5000))
     app.run(debug=False, threaded=True, host='0.0.0.0', port=port)

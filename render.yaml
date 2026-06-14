@@ -5,8 +5,14 @@ services:
     rootDir: backend
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn app:app
+    disk:
+      name: data
+      mountPath: /data
+      sizeGB: 1
     envVars:
       - key: GROQ_API_KEY
         sync: false
       - key: JWT_SECRET
         sync: false
+      - key: DB_PATH
+        value: /data/academic.db

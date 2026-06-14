@@ -198,7 +198,19 @@ select.inp:focus{border-color:#7c3aed}
 .flex{display:flex}.gap8{gap:8px}.gap12{gap:12px}.ac{align-items:center}.jb{justify-content:space-between}.wfull{width:100%}
 ::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(124,58,237,.3);border-radius:3px}
 ::-webkit-scrollbar-thumb:hover{background:rgba(124,58,237,.55)}
-@media(max-width:768px){#app{grid-template-columns:1fr}aside{display:none}.cs{padding:18px}}
+@media(max-width:768px){
+  #app{grid-template-columns:1fr}
+  aside{display:none}
+  .cs{padding:18px}
+  main{padding-bottom:68px}
+  #mobile-nav{display:flex}
+}
+@media(min-width:769px){#mobile-nav{display:none}}
+#mobile-nav{position:fixed;bottom:0;left:0;right:0;background:rgba(7,9,26,.97);border-top:1px solid var(--border);z-index:200;backdrop-filter:blur(20px);display:none}
+body.light #mobile-nav{background:rgba(255,255,255,.97)}
+.mnav-btn{flex:1;padding:10px 4px 8px;border:none;background:transparent;color:var(--text2);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10px;font-weight:600;font-family:inherit;transition:color .2s}
+.mnav-btn.active{color:#a78bfa}
+.mnav-btn .mni{font-size:20px}
 </style>
 </head>
 <body class="dark">
@@ -412,10 +424,24 @@ select.inp:focus{border-color:#7c3aed}
   </main>
 </div>
 
+<div id="mobile-nav">
+  <button class="mnav-btn active" onclick="go('dashboard')"><span class="mni">📊</span>Home</button>
+  <button class="mnav-btn" onclick="go('qa')"><span class="mni">💬</span>Ask AI</button>
+  <button class="mnav-btn" onclick="go('pdf')"><span class="mni">📄</span>PDF</button>
+  <button class="mnav-btn" onclick="go('quiz')"><span class="mni">🧠</span>Quiz</button>
+  <button class="mnav-btn" onclick="go('planner')"><span class="mni">📅</span>Planner</button>
+  <button class="mnav-btn" onclick="go('reminders')"><span class="mni">🔔</span>Reminders</button>
+</div>
 <div id="toasts"></div>
 
 <script>
 const API = '/api';
+const _mnavSections = ['dashboard','qa','pdf','quiz','planner','reminders'];
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = String(s || '');
+  return d.innerHTML;
+}
 let token = localStorage.getItem('token');
 let user = null;
 let isDark = localStorage.getItem('theme') !== 'light';
@@ -511,7 +537,7 @@ function enterApp() {
   document.getElementById('u-avatar').textContent = user.name[0].toUpperCase();
   loadStats(); loadTasks(); loadReminders();
   if ('Notification' in window && Notification.permission==='default') Notification.requestPermission();
-  setInterval(checkReminders, 60000);
+  setInterval(async () => { await loadReminders(); checkReminders(); }, 60000);
 }
 
 function go(sec) {
@@ -519,6 +545,8 @@ function go(sec) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById('s-' + sec).classList.add('active');
   document.getElementById('nav-' + sec).classList.add('active');
+  document.querySelectorAll('.mnav-btn').forEach((b, i) =>
+    b.classList.toggle('active', _mnavSections[i] === sec));
 }
 
 // STATS
@@ -542,7 +570,15 @@ function addMsg(text, isUser) {
   if (empty) empty.remove();
   const d = document.createElement('div');
   d.className = 'msg ' + (isUser ? 'user' : 'ai');
-  d.innerHTML = '<div class="mavatar">' + (isUser?'👤':'🤖') + '</div><div class="mbody">' + text.replace(/\n/g,'<br>') + '</div>';
+  const av = document.createElement('div');
+  av.className = 'mavatar';
+  av.textContent = isUser ? '👤' : '🤖';
+  const body = document.createElement('div');
+  body.className = 'mbody';
+  body.style.whiteSpace = 'pre-wrap';
+  body.textContent = text;
+  d.appendChild(av);
+  d.appendChild(body);
   box.appendChild(d);
   box.scrollTop = box.scrollHeight;
 }
@@ -626,9 +662,9 @@ function renderQuiz(topic) {
   quizData.forEach((q,i) => {
     const d = document.createElement('div'); d.className = 'quiz-q';
     d.innerHTML = '<div class="qnum">Question ' + (i+1) + ' of ' + quizData.length + '</div>' +
-      '<div class="qtext">' + q.question + '</div>' +
+      '<div class="qtext">' + esc(q.question) + '</div>' +
       '<div class="opts" id="opts-' + i + '">' +
-      q.options.map((o,j) => '<button class="opt" onclick="pick(' + i + ',' + j + ')" id="o-' + i + '-' + j + '">' + String.fromCharCode(65+j) + '. ' + o + '</button>').join('') +
+      q.options.map((o,j) => '<button class="opt" onclick="pick(' + i + ',' + j + ')" id="o-' + i + '-' + j + '">' + String.fromCharCode(65+j) + '. ' + esc(o) + '</button>').join('') +
       '</div>';
     c.appendChild(d);
   });
@@ -666,14 +702,14 @@ function showReview() {
   box.innerHTML = '<h3 style="font-weight:700;margin-bottom:16px">Review Answers</h3>';
   quizData.forEach((q,i) => {
     const d = document.createElement('div'); d.className = 'quiz-q';
-    d.innerHTML = '<div class="qnum">Question ' + (i+1) + '</div><div class="qtext">' + q.question + '</div>' +
+    d.innerHTML = '<div class="qnum">Question ' + (i+1) + '</div><div class="qtext">' + esc(q.question) + '</div>' +
       '<div class="opts">' + q.options.map((o,j) => {
         let cls = 'opt';
         if (j===q.correct_index) cls += ' correct';
         else if (j===answers[i] && answers[i]!==q.correct_index) cls += ' wrong';
-        return '<button class="' + cls + '" disabled>' + String.fromCharCode(65+j) + '. ' + o + '</button>';
+        return '<button class="' + cls + '" disabled>' + String.fromCharCode(65+j) + '. ' + esc(o) + '</button>';
       }).join('') + '</div>' +
-      (q.explanation ? '<div class="expl">💡 ' + q.explanation + '</div>' : '');
+      (q.explanation ? '<div class="expl">💡 ' + esc(q.explanation) + '</div>' : '');
     box.appendChild(d);
   });
 }
@@ -743,7 +779,7 @@ function renderTasks() {
   list.innerHTML = tasks.map(t =>
     '<div class="task ' + (t.done?'done':'') + '">' +
     '<div class="tcheck ' + (t.done?'on':'') + '" onclick="toggleTask(' + t.id + ')">' + (t.done?'✓':'') + '</div>' +
-    '<div class="tinfo"><div class="ttitle">' + t.title + '</div><div class="tmeta">' + (t.due_date?'📅 Due: '+new Date(t.due_date+'T00:00').toLocaleDateString():'No deadline') + '</div></div>' +
+    '<div class="tinfo"><div class="ttitle">' + esc(t.title) + '</div><div class="tmeta">' + (t.due_date?'📅 Due: '+new Date(t.due_date+'T00:00').toLocaleDateString():'No deadline') + '</div></div>' +
     '<span class="badge ' + (bm[t.subject]||'bo') + '">' + (sl[t.subject]||'Other') + '</span>' +
     '<button class="btn btn-secondary btn-sm" onclick="delTask(' + t.id + ')">✕</button>' +
     '</div>'
@@ -798,7 +834,7 @@ function renderReminders() {
     if (r.done){sc='sdone';st='Done'} else if(past){sc='sdue';st='Overdue'} else{sc='sup';st='Upcoming'}
     return '<div class="rem ' + (r.done?'done':'') + '">' +
       '<span style="font-size:20px">🔔</span>' +
-      '<div class="rinfo"><div class="rmsg">' + r.message + '</div><div class="rtime">📅 ' + t.toLocaleString() + '</div></div>' +
+      '<div class="rinfo"><div class="rmsg">' + esc(r.message) + '</div><div class="rtime">📅 ' + t.toLocaleString() + '</div></div>' +
       '<span class="rstatus ' + sc + '">' + st + '</span>' +
       (!r.done ? '<button class="btn btn-secondary btn-sm" onclick="dismissRem(' + r.id + ')">✓ Done</button>' : '') +
       '<button class="btn btn-secondary btn-sm" onclick="delRem(' + r.id + ')">✕</button>' +
